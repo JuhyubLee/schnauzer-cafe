@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>스프라이트 시트</title>
+<style>
+  body { background: #f3d9b4; font: 11px monospace; margin: 8px; }
+  figure { display: inline-block; margin: 4px; text-align: center; }
+  canvas { image-rendering: pixelated; display: block; margin: 0 auto; background: #e9c48e; }
+</style>
+<body>
+<script type="module">
+  import { buildAtlas, SPRITE_NAMES } from '../src/sprites.js';
+  const atlas = buildAtlas();
+  const scale = Number(new URLSearchParams(location.search).get('scale')) || 5;
+  const only = new URLSearchParams(location.search).get('q');
+  for (const name of SPRITE_NAMES) {
+    if (only && !name.includes(only)) continue;
+    if (!only && /^cust([2-9]|1\d)_/.test(name)) continue;
+    const src = atlas[name];
+    const c = document.createElement('canvas');
+    c.width = src.width; c.height = src.height;
+    c.style.width = src.width * scale + 'px';
+    c.getContext('2d').drawImage(src, 0, 0);
+    const f = document.createElement('figure');
+    f.append(c, name);
+    document.body.append(f);
+  }
+</script>
