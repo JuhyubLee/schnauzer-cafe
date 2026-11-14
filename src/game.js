@@ -15,7 +15,6 @@ const EAT_TIME = 5;
 const WALK_SPEED = 2.2; // 칸/초
 const PET_SPEED = 2.8;
 const PET_BOOST_TIME = 20;
-const OFFLINE_CAP = 8 * 3600;
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 // state: 저장되는 것. world: 화면에 돌아다니는 것(저장 안 함). edit: 꾸미기 중일 때만 있음.
@@ -49,7 +48,6 @@ function freshState() {
     tut: 0, sound: true, music: true, dim: true,
     photo: null,
     stats: { sold: 0, cooked: 0 },
-    lastSeen: Date.now(),
   };
 }
 
@@ -70,6 +68,7 @@ function upgrade(s) {
   s.music ??= true;
   s.dim ??= true;
   s.photo ??= null;
+  delete s.lastSeen; // 자리를 비운 동안 팔던 때 쓰던 값
   return s;
 }
 
@@ -98,7 +97,6 @@ function syncPets() {
 // 구경 중에는 state가 남의 가게라서 절대 저장하지 않는다. (저장하면 내 가게가 덮인다)
 export function save() {
   if (G.visit) return null;
-  G.state.lastSeen = Date.now();
   const json = JSON.stringify(G.state);
   try { localStorage.setItem(SAVE_KEY, json); } catch { /* 저장 공간이 막힌 브라우저 */ }
   mirror(SAVE_KEY, json);
@@ -153,7 +151,6 @@ export function leaveVisit() {
   customCache = null;
   freshWorld();
   emit('resize');
-  emit('home');
 }
 
 // ───── 백업 코드 ─────
@@ -744,30 +741,8 @@ export function expand() {
 
 // ───── 시간 ─────
 
-// 자리를 비운 동안 쌓아 둔 재고를 판다. 판 게 있으면 {sold, coins, elapsed}.
-export function catchUp() {
-  const s = G.state;
-  const elapsed = Math.min(OFFLINE_CAP, (Date.now() - s.lastSeen) / 1000);
-  s.lastSeen = Date.now();
-  if (elapsed < 60 || !seatCount()) return null;
-  G.world.customers = [];
-  let visits = Math.floor(elapsed / (spawnInterval() + 4));
-  let sold = 0, coins = 0;
-  for (; visits > 0; visits--) {
-    const have = inStock();
-    if (!have.length) break;
-    const r = have[rand(have.length)];
-    s.stock[r.id]--;
-    coins += r.price;
-    sold++;
-  }
-  if (!sold) return null;
-  s.coins += coins;
-  s.stats.sold += sold;
-  addXp(sold);
-  return { sold, coins, elapsed };
-}
-
+// 장사는 게임 화면이 켜져 있는 동안에만 한다. 화면을 끄면 이 함수가 불리지 않아서 손님도 판매도 멈춘다.
+// (요리는 끝나는 시각을 적어 두므로 꺼 둔 동안에도 익는다)
 export function tick(dt) {
   const w = G.world;
   w.time += dt;

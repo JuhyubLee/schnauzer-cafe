@@ -209,7 +209,6 @@ function shopFrom(snap) {
     custom, nextCustom: custom.length + 1,
     notes: [], tut: 4, sound: home.sound, music: home.music,
     stats: { sold: 0, cooked: 0 },
-    lastSeen: Date.now(),
   };
 }
 

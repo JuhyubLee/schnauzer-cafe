@@ -1,6 +1,6 @@
 // 시작점: 불러오기, 화면 크기 맞추기, 터치 처리, 매 프레임 갱신.
 import {
-  G, load, save, tick, catchUp, on, serve, petPet, collect, cookState, stoves, recipeOf,
+  G, load, save, tick, on, serve, petPet, collect, cookState, stoves, recipeOf,
   place, moveItem, paintFloor,
 } from './game.js';
 import { fmtTime } from './data.js';
@@ -127,19 +127,12 @@ canvas.addEventListener('pointercancel', () => { press = null; });
 // ── 음악: 브라우저가 화면을 한 번 누른 뒤에야 소리를 허락하므로, 누를 때마다 맞춰 본다 ──
 document.addEventListener('pointerdown', syncMusic);
 
-// ── 자리를 비웠다 돌아왔을 때 ──
-function comeBack() {
-  if (!G.state.started || G.visit) return;
-  const result = catchUp();
-  if (result) ui.showWelcome(result);
-}
-on('home', comeBack); // 놀러 갔다 돌아왔을 때도 그동안 팔린 것을 정산한다
+// ── 화면을 떠날 때 저장한다 ──
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden) { if (G.state.started) save(); } else comeBack();
+  if (document.hidden && G.state.started) save();
   syncMusic();
 });
 window.addEventListener('pagehide', () => { if (G.state.started) save(); });
-comeBack();
 
 // ── 초대장 링크(주소 뒤 #visit=...)로 들어왔을 때 ──
 ui.handleInvite(location.hash);
@@ -150,15 +143,14 @@ onBack(ui.back);
 
 // ── 매 프레임 ──
 // 바뀐 게 있으면 그 프레임에 바로 저장한다. 브라우저를 그냥 꺼도 마지막 조작이 남게.
-// 바뀐 게 없어도 5초마다 저장해서 '마지막으로 본 시각'을 새로 적는다.
-let last = performance.now(), uiT = 0, saveT = 0, saved = '';
+let last = performance.now(), uiT = 0, saved = '';
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   tick(dt);
   renderer.draw();
   if ((uiT += dt) > 0.25) { uiT = 0; ui.refresh(); }
-  if (G.state.started && !G.visit && ((saveT += dt) > 5 || JSON.stringify(G.state) !== saved)) { saveT = 0; saved = save(); }
+  if (G.state.started && !G.visit && JSON.stringify(G.state) !== saved) saved = save();
   requestAnimationFrame(frame);
 }
 fit();

@@ -1,8 +1,8 @@
 // 캔버스 밖의 화면: 위쪽 정보, 아래 버튼, 꾸미기 패널, 올라오는 창.
 // 친구(옷장)와 나만의 메뉴 화면은 ui-pet.js, ui-menu.js에 있다.
 import {
-  G, on, level, hint, josa, charm, seatCount, stoves, cookState, itemById, recipeOf, allRecipes,
-  startCook, collect, costOf, petPet, enterEdit, exitEdit, storeItem, upgradeStove, upgradeCost,
+  G, on, level, hint, charm, seatCount, stoves, cookState, itemById, recipeOf, allRecipes,
+  startCook, collect, costOf, enterEdit, exitEdit, storeItem, upgradeStove, upgradeCost,
   setWall, expand, save, reset, startGame, exportSave, importSave,
 } from './game.js';
 import {
@@ -250,7 +250,7 @@ export function initUI({ atlas, renderer }) {
     return false;
   }
 
-  // ── 레벨 업, 다녀왔을 때 ──
+  // ── 레벨 업 ──
   function showLevelUp({ lv, reward, unlocks }) {
     sfx('level');
     if (sheetOpen() || G.edit) { toast(`레벨 ${lv}! 코인 ${reward}개를 받았어요`); return; }
@@ -261,17 +261,6 @@ export function initUI({ atlas, renderer }) {
         <ul class="list">${items}</ul>
         <button type="button" class="btn primary big" data-act="ok">좋아요</button>
       </div>`, { actions: { ok: closeSheet } });
-  }
-
-  function showWelcome({ sold, coins, elapsed }) {
-    const first = G.state.pets[0];
-    const who = G.state.pets.length > 1 ? '친구들이' : esc(josa(first.name, '이', '가'));
-    openSheet('다녀오셨어요', `<div class="center stack">
-        <img class="px hero" src="${petFace(first)}" alt="">
-        <p>${who} ${fmtTime(Math.floor(elapsed / 60) * 60)} 동안<br><b>${sold}그릇</b>을 팔았어요</p>
-        <p>${coin('+' + coins)}</p>
-        <button type="button" class="btn primary big" data-act="ok">잘했어!</button>
-      </div>`, { actions: { ok() { petPet(first.id); closeSheet(); } } });
   }
 
   // ── 꾸미기 ──
@@ -455,7 +444,7 @@ export function initUI({ atlas, renderer }) {
 
   refresh();
   return {
-    refresh, renderEdit, openCook, showWelcome, toast, back,
+    refresh, renderEdit, openCook, toast, back,
     handleInvite: visitUI.handleInvite, openPhoto: photoUI.open,
   };
 }
