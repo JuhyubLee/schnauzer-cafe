@@ -1,19 +1,30 @@
 // 게임 수치. 메뉴·가구·가격을 바꾸려면 이 파일만 고치면 된다.
 
 // time: 조리 시간(초), n: 한 번에 나오는 그릇 수, price: 한 그릇 값, lv: 열리는 레벨
+// 이름은 실제 상표와 겹치지 않는 흔한 말로 쓴다.
+// id는 저장 데이터에 들어가므로 이름을 바꿔도 id는 그대로 둔다.
 export const RECIPES = [
   { id: 'americano', name: '아이스 아메리카노', icon: 'f_americano', lv: 1, cost: 8, time: 15, n: 4, price: 5, xp: 3 },
   { id: 'riceball', name: '참치 주먹밥', icon: 'f_riceball', lv: 1, cost: 20, time: 40, n: 5, price: 9, xp: 5 },
-  { id: 'tteok', name: '엽기 떡볶이', icon: 'f_tteok', lv: 2, cost: 55, time: 120, n: 8, price: 15, xp: 12 },
-  { id: 'coolpis', name: '쿨피스', icon: 'f_coolpis', lv: 2, cost: 12, time: 30, n: 6, price: 5, xp: 4 },
-  { id: 'buldak', name: '불닭볶음면', icon: 'f_buldak', lv: 3, cost: 90, time: 300, n: 8, price: 24, xp: 22 },
+  { id: 'tteok', name: '매운 떡볶이', icon: 'f_tteok', lv: 2, cost: 55, time: 120, n: 8, price: 15, xp: 12 },
+  { id: 'coolpis', name: '복숭아 주스', icon: 'f_coolpis', lv: 2, cost: 12, time: 30, n: 6, price: 5, xp: 4 },
+  { id: 'buldak', name: '매콤 볶음면', icon: 'f_buldak', lv: 3, cost: 90, time: 300, n: 8, price: 24, xp: 22 },
   { id: 'egg', name: '폭신 계란찜', icon: 'f_egg', lv: 4, cost: 70, time: 480, n: 6, price: 28, xp: 26 },
   { id: 'rose', name: '로제 파스타', icon: 'f_rose', lv: 5, cost: 160, time: 900, n: 10, price: 36, xp: 45 },
   { id: 'cream', name: '크림 파스타', icon: 'f_cream', lv: 6, cost: 220, time: 1800, n: 12, price: 42, xp: 70 },
   { id: 'cheesetteok', name: '치즈 폭탄 떡볶이', icon: 'f_cheesetteok', lv: 7, cost: 300, time: 3600, n: 14, price: 50, xp: 110 },
-  { id: 'buldakpasta', name: '불닭 크림 파스타', icon: 'f_buldakpasta', lv: 8, cost: 420, time: 10800, n: 16, price: 64, xp: 200 },
+  { id: 'buldakpasta', name: '매콤 크림 파스타', icon: 'f_buldakpasta', lv: 8, cost: 420, time: 10800, n: 16, price: 64, xp: 200 },
 ];
 export const RECIPE = Object.fromEntries(RECIPES.map(r => [r.id, r]));
+
+// 나만의 메뉴: 이름과 그림은 자유, 수치는 세 등급 중에서 고른다. (기본 메뉴와 같은 수치라 균형이 안 깨진다)
+export const CUSTOM_TIERS = {
+  quick: { name: '간단 메뉴', lv: 1, cost: 15, time: 30, n: 5, price: 6, xp: 4 },
+  meal: { name: '든든 메뉴', lv: 3, cost: 90, time: 300, n: 8, price: 24, xp: 22 },
+  special: { name: '특별 메뉴', lv: 6, cost: 220, time: 1800, n: 12, price: 42, xp: 70 },
+};
+export const MAX_CUSTOM = 6;
+export const CUSTOM_NAME_MAX = 10;
 
 // block: 지나갈 수 없음, charm: 분위기 점수(손님이 더 자주 오고 팁을 준다)
 export const FURN = {
@@ -22,10 +33,42 @@ export const FURN = {
   stove: { name: '화구', sprite: 'stove', price: 250, lv: 1, block: true },
   plant: { name: '초록 화분', sprite: 'plant', price: 40, lv: 1, block: true, charm: 2 },
   rug: { name: '주황 러그', sprite: 'rug', price: 30, lv: 2, block: false, charm: 1 },
-  dogbed: { name: '강아지 방석', sprite: 'dogbed', price: 90, lv: 2, block: false, charm: 2 },
+  dogbed: { name: '폭신 방석', sprite: 'dogbed', price: 90, lv: 2, block: false, charm: 2 },
   flower: { name: '주황 꽃 화분', sprite: 'flower', price: 70, lv: 3, block: true, charm: 3 },
   lamp: { name: '스탠드 조명', sprite: 'lamp', price: 120, lv: 4, block: true, charm: 4 },
   shelf: { name: '책장', sprite: 'shelf', price: 180, lv: 5, block: true, charm: 5 },
+};
+
+// 동물 친구. id는 sprites.js의 PET_PAL과 같아야 한다.
+// hatDy: 머리 높이가 달라서 모자를 몇 줄 내려(+) 또는 올려(-) 씌울지. nick: 이름을 안 지었을 때 쓰는 이름
+export const PETS = {
+  schnauzer: { name: '슈나우저', hatDy: 0, nick: '슈슈' },
+  maltese: { name: '말티즈', hatDy: 0, nick: '몽이' },
+  shiba: { name: '시바견', hatDy: 1, nick: '콩이' },
+  poodle: { name: '푸들', hatDy: -1, nick: '초코' },
+  cheese: { name: '치즈 고양이', hatDy: 1, nick: '치즈' },
+  tuxedo: { name: '턱시도 고양이', hatDy: 1, nick: '턱시' },
+  graycat: { name: '회색 고양이', hatDy: 1, nick: '구름' },
+};
+// n번째 친구를 데려오는 조건 (첫 친구는 가게를 열 때 고른다)
+export const PET_SLOTS = [{ lv: 1, price: 0 }, { lv: 4, price: 600 }, { lv: 8, price: 2500 }];
+export const PET_NAME_MAX = 6;
+
+// 옷. slot마다 하나씩 입는다. 그림은 sprites.js의 wear_<id>.
+export const WEAR_SLOTS = { hat: '모자', neck: '목', body: '옷' };
+export const WEAR = {
+  hat_ribbon: { name: '주황 리본', slot: 'hat', price: 80 },
+  hat_chef: { name: '요리사 모자', slot: 'hat', price: 150 },
+  hat_straw: { name: '밀짚모자', slot: 'hat', price: 200 },
+  hat_beret: { name: '빨간 베레모', slot: 'hat', price: 250 },
+  hat_crown: { name: '왕관', slot: 'hat', price: 800 },
+  neck_scarf: { name: '주황 스카프', slot: 'neck', price: 60 },
+  neck_bow: { name: '나비넥타이', slot: 'neck', price: 120 },
+  neck_bell: { name: '방울 목걸이', slot: 'neck', price: 180 },
+  body_apron: { name: '하얀 앞치마', slot: 'body', price: 100 },
+  body_stripe: { name: '줄무늬 티', slot: 'body', price: 150 },
+  body_sweater: { name: '분홍 스웨터', slot: 'body', price: 250 },
+  body_raincoat: { name: '노란 우비', slot: 'body', price: 300 },
 };
 
 // 레벨별 화구 최대 개수: [레벨, 개수]

@@ -1,27 +1,59 @@
 <!doctype html>
 <meta charset="utf-8">
 <title>스프라이트 시트</title>
+<!--
+  그림을 한눈에 보는 개발용 페이지.
+  ?q=이름일부  그 이름이 들어간 그림만
+  ?scale=8     확대 배율
+  ?pets=1      모든 동물에게 모든 옷을 입혀 본다
+-->
 <style>
   body { background: #f3d9b4; font: 11px monospace; margin: 8px; }
   figure { display: inline-block; margin: 4px; text-align: center; }
-  canvas { image-rendering: pixelated; display: block; margin: 0 auto; background: #e9c48e; }
+  canvas, img { image-rendering: pixelated; display: block; margin: 0 auto; background: #e9c48e; }
+  h3 { margin: 12px 4px 0; font: bold 13px monospace; }
 </style>
 <body>
 <script type="module">
   import { buildAtlas, SPRITE_NAMES } from '../src/sprites.js';
+  import { createRenderer } from '../src/render.js';
+  import { PETS, WEAR } from '../src/data.js';
+
   const atlas = buildAtlas();
-  const scale = Number(new URLSearchParams(location.search).get('scale')) || 5;
-  const only = new URLSearchParams(location.search).get('q');
-  for (const name of SPRITE_NAMES) {
-    if (only && !name.includes(only)) continue;
-    if (!only && /^cust([2-9]|1\d)_/.test(name)) continue;
-    const src = atlas[name];
-    const c = document.createElement('canvas');
-    c.width = src.width; c.height = src.height;
-    c.style.width = src.width * scale + 'px';
-    c.getContext('2d').drawImage(src, 0, 0);
-    const f = document.createElement('figure');
-    f.append(c, name);
-    document.body.append(f);
+  const params = new URLSearchParams(location.search);
+  const scale = Number(params.get('scale')) || 5;
+  const only = params.get('q');
+
+  if (params.get('pets')) {
+    const { petURL } = createRenderer(document.createElement('canvas'), atlas);
+    const show = (title, wornOf) => {
+      const h = document.createElement('h3');
+      h.textContent = title;
+      document.body.append(h);
+      for (const id of Object.keys(PETS)) {
+        const img = new Image();
+        img.src = petURL(id, wornOf(id));
+        img.style.width = 16 * scale + 'px';
+        const f = document.createElement('figure');
+        f.append(img, PETS[id].name);
+        document.body.append(f);
+      }
+    };
+    show('맨몸', () => ({}));
+    for (const [id, w] of Object.entries(WEAR)) show(`${w.name} (${id})`, () => ({ [w.slot]: id }));
+    show('모두 입기', () => ({ hat: 'hat_straw', neck: 'neck_bell', body: 'body_stripe' }));
+  } else {
+    for (const name of SPRITE_NAMES) {
+      if (only && !name.includes(only)) continue;
+      if (!only && /^cust([2-9]|1\d)_/.test(name)) continue;
+      const src = atlas[name];
+      const c = document.createElement('canvas');
+      c.width = src.width; c.height = src.height;
+      c.style.width = src.width * scale + 'px';
+      c.getContext('2d').drawImage(src, 0, 0);
+      const f = document.createElement('figure');
+      f.append(c, name);
+      document.body.append(f);
+    }
   }
 </script>

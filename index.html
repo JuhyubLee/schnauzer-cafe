@@ -40,7 +40,7 @@
     <nav id="bar">
       <button type="button" data-nav="cook"><img class="px" alt=""><span>요리</span></button>
       <button type="button" data-nav="edit"><img class="px" alt=""><span>꾸미기</span></button>
-      <button type="button" data-nav="dog"><img class="px" alt=""><span id="dogLabel"></span></button>
+      <button type="button" data-nav="pet"><img class="px" id="petIcon" alt=""><span id="petLabel"></span></button>
       <button type="button" data-nav="notes"><img class="px" alt=""><span>의견</span></button>
     </nav>
 
@@ -71,11 +71,13 @@
     <div id="toast" role="status" aria-live="polite"></div>
 
     <form id="intro" hidden>
-      <img class="px" id="introDog" alt="">
+      <img class="px" id="introPet" alt="">
       <h1>슈나우저 분식카페</h1>
       <p>떡볶이도 팔고 파스타도 파는<br>우리만의 작은 가게</p>
       <label>가게 이름<input id="introShop" maxlength="12" placeholder="주황 분식카페" autocomplete="off"></label>
-      <label>강아지 이름<input id="introDogName" maxlength="6" placeholder="슈슈" autocomplete="off"></label>
+      <p class="intro-label" id="introPetsLabel">함께할 친구</p>
+      <div id="introPets" class="hscroll" role="radiogroup" aria-labelledby="introPetsLabel"></div>
+      <label>친구 이름<input id="introPetName" maxlength="6" autocomplete="off"></label>
       <button type="submit" class="btn primary big">가게 열기</button>
     </form>
   </div>

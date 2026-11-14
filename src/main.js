@@ -1,18 +1,28 @@
 // 시작점: 불러오기, 화면 크기 맞추기, 터치 처리, 매 프레임 갱신.
 import {
-  G, load, save, tick, catchUp, on, serve, petDog, collect, cookState, stoves,
+  G, load, save, tick, catchUp, on, serve, petPet, collect, cookState, stoves, recipeOf,
   place, moveItem, paintFloor,
 } from './game.js';
-import { RECIPE, fmtTime } from './data.js';
-import { buildAtlas } from './sprites.js';
+import { fmtTime } from './data.js';
+import { buildAtlas, setSprite } from './sprites.js';
 import { createRenderer, VIEW_W, viewH, tileAt, TILE, PAD, WALL_H } from './render.js';
 import { initUI } from './ui.js';
 import { sfx } from './sfx.js';
+import { syncMusic } from './music.js';
 
 load();
 const canvas = document.getElementById('cv');
 const stage = document.getElementById('stage');
 const atlas = buildAtlas();
+
+// 나만의 메뉴 아이콘은 저장에 들어 있는 그림으로 만든다. 고칠 때마다 다시 만든다.
+const customSprite = c => setSprite(atlas, `custom_${c.id}`, c.px);
+G.state.custom.forEach(customSprite);
+on('custom', id => {
+  const c = G.state.custom.find(c => c.id === id);
+  if (c) customSprite(c);
+});
+
 const renderer = createRenderer(canvas, atlas);
 const ui = initUI({ atlas, renderer });
 
@@ -56,13 +66,20 @@ function playTap(p) {
   }
   if (best) { serve(best); return; }
 
-  const d = w.dog;
-  if (inRect(p, PAD + d.x * TILE - 3, WALL_H + d.y * TILE - 6, TILE + 6, TILE + 8)) { petDog(); return; }
+  // 동물 친구: 겹쳐 있으면 누른 곳에 가까운 쪽을 쓰다듬는다.
+  let pet = null, petD = Infinity;
+  for (const q of w.pets) {
+    const x = PAD + q.x * TILE, y = WALL_H + q.y * TILE;
+    if (!inRect(p, x - 3, y - 6, TILE + 6, TILE + 8)) continue;
+    const d = Math.hypot(p.x - (x + 8), p.y - (y + 8));
+    if (d < petD) { pet = q; petD = d; }
+  }
+  if (pet) { petPet(pet.id); return; }
 
   const it = renderer.pickItem(p.x, p.y);
   if (it?.type !== 'stove') return;
   if (cookState(it) === 'idle') { sfx('tap'); ui.openCook(it.id); }
-  else ui.toast(`${RECIPE[it.cook.r].name} · ${fmtTime((it.cook.end - Date.now()) / 1000)} 남았어요`);
+  else ui.toast(`${recipeOf(it.cook.r).name} · ${fmtTime((it.cook.end - Date.now()) / 1000)} 남았어요`);
 }
 
 function editTap(p) {
@@ -101,6 +118,9 @@ canvas.addEventListener('pointerup', e => {
 });
 canvas.addEventListener('pointercancel', () => { press = null; });
 
+// ── 음악: 브라우저가 화면을 한 번 누른 뒤에야 소리를 허락하므로, 누를 때마다 맞춰 본다 ──
+document.addEventListener('pointerdown', syncMusic);
+
 // ── 자리를 비웠다 돌아왔을 때 ──
 function comeBack() {
   if (!G.state.started) return;
@@ -109,6 +129,7 @@ function comeBack() {
 }
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { if (G.state.started) save(); } else comeBack();
+  syncMusic();
 });
 window.addEventListener('pagehide', () => { if (G.state.started) save(); });
 comeBack();

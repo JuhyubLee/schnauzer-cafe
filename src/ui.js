@@ -1,26 +1,26 @@
 // 캔버스 밖의 화면: 위쪽 정보, 아래 버튼, 꾸미기 패널, 올라오는 창.
+// 친구(옷장)와 나만의 메뉴 화면은 ui-pet.js, ui-menu.js에 있다.
 import {
-  G, on, level, hint, josa, charm, seatCount, stoves, cookState, itemById,
-  startCook, collect, costOf, petDog, enterEdit, exitEdit, storeItem, upgradeStove, upgradeCost,
-  setWall, expand, save, reset, exportSave, importSave,
+  G, on, level, hint, josa, charm, seatCount, stoves, cookState, itemById, recipeOf, allRecipes,
+  startCook, collect, costOf, petPet, enterEdit, exitEdit, storeItem, upgradeStove, upgradeCost,
+  setWall, expand, save, reset, startGame, exportSave, importSave,
 } from './game.js';
-import { RECIPES, RECIPE, FURN, FLOORS, WALLS, EXPANSIONS, LEVEL_XP, stoveLimit, fmtTime } from './data.js';
+import { FURN, FLOORS, WALLS, EXPANSIONS, LEVEL_XP, PETS, MAX_CUSTOM, stoveLimit, fmtTime } from './data.js';
+import { $, esc, setText, setHTML, setSrc } from './dom.js';
 import { sfx } from './sfx.js';
-
-const $ = id => document.getElementById(id);
-const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const setText = (el, text) => { if (el.textContent !== String(text)) el.textContent = text; };
-const setHTML = (el, html) => { if (el._html !== html) { el._html = html; el.innerHTML = html; } };
+import { syncMusic } from './music.js';
+import { createPetUI } from './ui-pet.js';
+import { createMenuUI } from './ui-menu.js';
 
 export function initUI({ atlas, renderer }) {
   const icons = {};
   const icon = name => (icons[name] ||= atlas[name].toDataURL());
   const coin = n => `<span class="coin"><img class="px" src="${icon('coin')}" alt="코인">${n}</span>`;
+  const petFace = pet => renderer.petURL(pet.species, pet.wear, true);
 
-  $('shopIcon').src = $('introDog').src = icon('dog_face');
   $('coinIcon').src = icon('coin');
-  const navIcons = { cook: 'f_tteok', edit: 'hammer', dog: 'dog_face', notes: 'note' };
-  for (const btn of document.querySelectorAll('#bar button')) btn.querySelector('img').src = icon(navIcons[btn.dataset.nav]);
+  const navIcons = { cook: 'f_tteok', edit: 'hammer', notes: 'note' };
+  for (const [nav, name] of Object.entries(navIcons)) document.querySelector(`[data-nav="${nav}"] img`).src = icon(name);
 
   // ── 알림 ──
   let toastTimer = 0;
@@ -35,14 +35,16 @@ export function initUI({ atlas, renderer }) {
   // ── 올라오는 창 ──
   let sheetLive = null; // 창이 열려 있는 동안 주기적으로 부르는 갱신 함수
   let actions = {};
+  // opts: live(주기 갱신), actions(data-act → 함수), keepScroll(같은 창을 다시 그릴 때 스크롤 유지)
   function openSheet(title, html, opts = {}) {
     $('sheetTitle').textContent = title;
     const body = $('sheetBody');
+    const top = opts.keepScroll ? body.scrollTop : 0;
     body.innerHTML = html;
     actions = opts.actions || {};
     sheetLive = opts.live || null;
     $('sheetWrap').hidden = false;
-    body.scrollTop = 0; // 창이 보이는 상태에서만 먹힌다
+    body.scrollTop = top; // 창이 보이는 상태에서만 먹힌다
     sheetLive?.();
   }
   function closeSheet() {
@@ -60,32 +62,41 @@ export function initUI({ atlas, renderer }) {
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetOpen()) closeSheet(); });
 
+  const kit = { icon, coin, toast, openSheet, closeSheet, renderer, refresh };
+  const petUI = createPetUI(kit);
+  const menuUI = createMenuUI(kit);
+
   // ── 요리 ──
   function openCook(stoveId = null) {
-    const lv = level();
-    const rows = RECIPES.map(r => {
+    const lv = level(), s = G.state;
+    const rows = allRecipes().map(r => {
       const locked = r.lv > lv;
       const info = locked ? `레벨 ${r.lv}에 열려요` : `${fmtTime(r.time)} · ${r.n}그릇 · 그릇당 ${r.price}`;
-      return `<button type="button" class="row" data-act="cook" data-r="${r.id}" ${locked ? 'disabled' : ''}>
+      const row = `<button type="button" class="row" data-act="cook" data-r="${r.id}" ${locked ? 'disabled' : ''}>
         <img class="px" src="${icon(r.icon)}" alt="">
-        <span class="meta"><b>${r.name}</b><small>${info}</small></span>
+        <span class="meta"><b>${esc(r.name)}</b><small>${info}</small></span>
         <span class="right"><span class="coin"><img class="px" src="${icon('coin')}" alt="코인"><span data-cost="${r.id}"></span></span><small data-stock="${r.id}"></small></span>
       </button>`;
+      return r.custom
+        ? `<div class="row-pair">${row}<button type="button" class="btn" data-act="edit" data-r="${r.id}">고치기</button></div>`
+        : row;
     }).join('');
     const lines = stoves().map(st => `<div class="stove-line" data-stove="${st.id}"></div>`).join('');
-    openSheet('요리', `<div>${lines}</div>${rows}`, {
+    const add = s.custom.length < MAX_CUSTOM
+      ? `<button type="button" class="btn big" data-act="create">나만의 메뉴 만들기 (${s.custom.length}/${MAX_CUSTOM})</button>`
+      : `<p class="muted center">나만의 메뉴를 ${MAX_CUSTOM}개 모두 만들었어요</p>`;
+    openSheet('요리', `<div>${lines}</div>${rows}${add}`, {
       live() {
-        const s = G.state;
         stoves().forEach((st, i) => {
           const el = document.querySelector(`[data-stove="${st.id}"]`);
           if (!el) return;
-          const state = cookState(st), name = st.cook && RECIPE[st.cook.r].name;
+          const state = cookState(st), name = st.cook && esc(recipeOf(st.cook.r).name);
           setHTML(el, state === 'idle' ? `<span>화구 ${i + 1} · 비어 있어요</span>`
             : state === 'cooking' ? `<span>화구 ${i + 1} · ${name} · ${fmtTime((st.cook.end - Date.now()) / 1000)} 남음</span>`
               : `<span>화구 ${i + 1} · ${name} 완성</span><button type="button" class="btn primary" data-act="collect" data-id="${st.id}">꺼내기</button>`);
         });
         for (const el of document.querySelectorAll('[data-stock]')) {
-          const r = RECIPE[el.dataset.stock];
+          const r = recipeOf(el.dataset.stock);
           setText(el, `재고 ${s.stock[r.id] || 0}`);
           const cost = costOf(r), row = el.closest('.row');
           setText(row.querySelector('[data-cost]'), cost);
@@ -100,22 +111,9 @@ export function initUI({ atlas, renderer }) {
           if (startCook(target.id, el.dataset.r)) { sfx('cook'); closeSheet(); }
         },
         collect(el) { collect(Number(el.dataset.id)); },
+        create() { sfx('tap'); menuUI.openEditor(null, () => openCook(stoveId)); },
+        edit(el) { sfx('tap'); menuUI.openEditor(el.dataset.r, () => openCook(stoveId)); },
       },
-    });
-  }
-
-  // ── 강아지 ──
-  function openDog() {
-    const s = G.state, name = esc(s.dogName);
-    openSheet(s.dogName, `<div class="center stack">
-        <img class="px hero" src="${icon('dog_face')}" alt="">
-        <p><img class="px" src="${icon('heart')}" alt="" width="18" height="16"> 친밀도 <b id="dogLove"></b></p>
-        <p class="muted">쓰다듬으면 신나서 20초 동안 더 빨리 서빙해요.<br>가게에서 ${esc(josa(s.dogName, '을', '를'))} 직접 눌러도 돼요.</p>
-        <button type="button" class="btn primary big" data-act="pet">${name} 쓰다듬기</button>
-        <p class="muted">지금까지 손님 <b id="dogSold"></b>명을 대접했어요</p>
-      </div>`, {
-      live() { setText($('dogLove'), s.dog.love); setText($('dogSold'), s.stats.sold); },
-      actions: { pet: petDog },
     });
   }
 
@@ -127,7 +125,7 @@ export function initUI({ atlas, renderer }) {
           <button type="button" class="btn" data-act="del" data-i="${i}">지우기</button></li>`).join('')
       : '<li><span class="muted">아직 적어 둔 의견이 없어요</span></li>';
     openSheet('의견', `<p class="muted">이런 게 있으면 좋겠다 싶은 걸 적어 두세요. 다음 버전에 넣을게요.</p>
-      <textarea id="noteText" rows="3" maxlength="200" placeholder="예) 마라탕도 팔고 싶어, 강아지 옷 입히고 싶어"></textarea>
+      <textarea id="noteText" rows="3" maxlength="200" placeholder="예) 마라탕도 팔고 싶어, 가구가 더 많았으면 좋겠어"></textarea>
       <div class="pair">
         <button type="button" class="btn primary" data-act="add">적어 두기</button>
         <button type="button" class="btn" data-act="share">모아서 보내기</button>
@@ -179,14 +177,16 @@ export function initUI({ atlas, renderer }) {
   // ── 설정 ──
   function openSettings() {
     const s = G.state;
-    const soundLabel = () => `소리 ${s.sound ? '켜짐' : '꺼짐'}`;
+    const onOff = (label, on) => `${label} ${on ? '켜짐' : '꺼짐'}`;
     openSheet('가게 설정', `<div class="stack">
         <label class="field">가게 이름<input id="setShop" maxlength="12" value="${esc(s.shopName)}" autocomplete="off"></label>
-        <label class="field">강아지 이름<input id="setDog" maxlength="6" value="${esc(s.dogName)}" autocomplete="off"></label>
-        <button type="button" class="btn primary" data-act="names">이름 바꾸기</button>
+        <button type="button" class="btn primary" data-act="name">이름 바꾸기</button>
         <p class="muted">분위기 ${charm()} · 손님 자리 ${seatCount()}개 · 만든 요리 ${s.stats.cooked}번</p>
         <hr>
-        <button type="button" class="btn" data-act="sound">${soundLabel()}</button>
+        <div class="pair">
+          <button type="button" class="btn" data-act="music">${onOff('음악', s.music)}</button>
+          <button type="button" class="btn" data-act="sound">${onOff('효과음', s.sound)}</button>
+        </div>
         <hr>
         <p><b>가게 백업</b></p>
         <p class="muted">백업 코드를 카톡 '나에게 보내기'에 붙여 두면, 폰을 바꾸거나 저장이 지워져도 가게를 되살릴 수 있어요.</p>
@@ -197,15 +197,15 @@ export function initUI({ atlas, renderer }) {
         <button type="button" class="btn danger" data-act="reset">처음부터 다시 하기</button>
       </div>`, {
       actions: {
-        names() {
+        name() {
           s.shopName = $('setShop').value.trim() || s.shopName;
-          s.dogName = $('setDog').value.trim() || s.dogName;
           save();
           closeSheet();
           refresh();
           toast('이름을 바꿨어요');
         },
-        sound(el) { s.sound = !s.sound; el.textContent = soundLabel(); save(); sfx('tap'); },
+        music(el) { s.music = !s.music; el.textContent = onOff('음악', s.music); save(); syncMusic(); },
+        sound(el) { s.sound = !s.sound; el.textContent = onOff('효과음', s.sound); save(); sfx('tap'); },
         async backup() {
           const code = exportSave();
           if (await copyText(code)) { toast('백업 코드를 복사했어요. 카톡에 붙여 두세요'); return; }
@@ -251,13 +251,14 @@ export function initUI({ atlas, renderer }) {
   }
 
   function showWelcome({ sold, coins, elapsed }) {
-    const s = G.state;
+    const first = G.state.pets[0];
+    const who = G.state.pets.length > 1 ? '친구들이' : esc(josa(first.name, '이', '가'));
     openSheet('다녀오셨어요', `<div class="center stack">
-        <img class="px hero" src="${icon('dog_face')}" alt="">
-        <p>${esc(josa(s.dogName, '이', '가'))} ${fmtTime(Math.floor(elapsed / 60) * 60)} 동안<br><b>${sold}그릇</b>을 팔았어요</p>
+        <img class="px hero" src="${petFace(first)}" alt="">
+        <p>${who} ${fmtTime(Math.floor(elapsed / 60) * 60)} 동안<br><b>${sold}그릇</b>을 팔았어요</p>
         <p>${coin('+' + coins)}</p>
         <button type="button" class="btn primary big" data-act="ok">잘했어!</button>
-      </div>`, { actions: { ok() { petDog(); closeSheet(); } } });
+      </div>`, { actions: { ok() { petPet(first.id); closeSheet(); } } });
   }
 
   // ── 꾸미기 ──
@@ -368,38 +369,59 @@ export function initUI({ atlas, renderer }) {
   function refresh() {
     const s = G.state, lv = level();
     setText($('shopName'), s.shopName);
-    setText($('dogLabel'), s.dogName);
     setText($('coinNum'), s.coins);
     setText($('lvNum'), `Lv ${lv}`);
     const lo = LEVEL_XP[lv - 1], hi = LEVEL_XP[lv];
     $('xpFill').style.width = hi ? `${Math.round(((s.xp - lo) / (hi - lo)) * 100)}%` : '100%';
+    const first = s.pets[0];
+    if (first) {
+      setText($('petLabel'), s.pets.length > 1 ? '친구들' : first.name);
+      setSrc($('petIcon'), petFace(first));
+      setSrc($('shopIcon'), petFace(first));
+    }
     const h = s.started ? hint() : '';
     $('hint').hidden = !h;
     setText($('hint'), h);
     sheetLive?.();
   }
 
-  // ── 아래 버튼, 첫 화면 ──
+  // ── 아래 버튼 ──
   $('bar').addEventListener('click', ev => {
     const btn = ev.target.closest('[data-nav]');
     if (!btn) return;
     sfx('tap');
-    ({ cook: openCook, edit: openEdit, dog: openDog, notes: openNotes })[btn.dataset.nav]();
+    ({ cook: openCook, edit: openEdit, pet: () => petUI.openPets(), notes: openNotes })[btn.dataset.nav]();
   });
   $('shopBtn').addEventListener('click', () => { sfx('tap'); openSettings(); });
 
+  // ── 첫 화면: 가게 이름, 함께할 친구 ──
   const intro = $('intro');
+  let introSpecies = Object.keys(PETS)[0];
+  function renderIntro() {
+    $('introPets').innerHTML = Object.entries(PETS).map(([id, p]) =>
+      `<button type="button" class="card ${id === introSpecies ? 'on' : ''}" role="radio" aria-checked="${id === introSpecies}" data-id="${id}">
+        <img class="px" src="${renderer.petURL(id)}" alt=""><b>${p.name}</b></button>`).join('');
+    $('introPet').src = renderer.petURL(introSpecies, {}, true);
+    $('introPetName').placeholder = PETS[introSpecies].nick;
+  }
+  $('introPets').addEventListener('click', ev => {
+    const el = ev.target.closest('[data-id]');
+    if (!el) return;
+    introSpecies = el.dataset.id;
+    renderIntro();
+  });
   intro.hidden = G.state.started;
+  if (!G.state.started) renderIntro();
   intro.addEventListener('submit', ev => {
     ev.preventDefault();
-    const s = G.state;
-    s.shopName = $('introShop').value.trim() || $('introShop').placeholder;
-    s.dogName = $('introDogName').value.trim() || $('introDogName').placeholder;
-    s.started = true;
-    s.lastSeen = Date.now();
-    save();
+    startGame({
+      shopName: $('introShop').value.trim() || $('introShop').placeholder,
+      petName: $('introPetName').value.trim() || $('introPetName').placeholder,
+      species: introSpecies,
+    });
     intro.hidden = true;
     sfx('level');
+    syncMusic();
     refresh();
   });
 
@@ -410,6 +432,7 @@ export function initUI({ atlas, renderer }) {
   on('pet', () => sfx('bark'));
   on('place', () => sfx('place'));
   on('levelup', showLevelUp);
+  on('custom', id => { delete icons[`custom_${id}`]; });
 
   refresh();
   return { refresh, renderEdit, openCook, showWelcome, toast };

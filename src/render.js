@@ -1,6 +1,6 @@
 // 캔버스 그리기. 논리 해상도(1칸 = 16px)로 그리고, 확대는 CSS가 한다.
-import { G, COLS, DOOR_X, cookState, patienceLeft } from './game.js';
-import { FURN, FLOORS, WALLS, RECIPE } from './data.js';
+import { G, COLS, DOOR_X, cookState, patienceLeft, recipeOf, petById } from './game.js';
+import { FURN, FLOORS, WALLS, PETS } from './data.js';
 
 export const TILE = 16;
 export const PAD = 4; // 좌우·아래 벽 두께
@@ -10,6 +10,7 @@ export const viewH = rows => WALL_H + rows * TILE + PAD;
 export const tileAt = (px, py) => ({ x: Math.floor((px - PAD) / TILE), y: Math.floor((py - WALL_H) / TILE) });
 
 const INK = '#3b2b2b';
+const HAT_ROOM = 3; // 모자가 동물 그림 위로 올라가는 줄 수
 const DIGITS = {
   0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111',
   4: '101101111001001', 5: '111100111001111', 6: '111100111101111', 7: '111001001010010',
@@ -84,6 +85,15 @@ export function createRenderer(canvas, atlas) {
     spr(name, PAD + tx * TILE + (TILE - s.width) / 2, WALL_H + (ty + 1) * TILE - s.height + dy);
   };
 
+  // 동물 한 마리를 옷과 함께 그린다. (x, y)는 동물 그림의 왼쪽 위. 모자는 그 위로 올라간다.
+  function petAt(ctx, x, y, species, frame, worn, flip = false) {
+    const f = flip ? '~' : '';
+    ctx.drawImage(atlas[`pet_${species}_${frame}${f}`], x, y);
+    if (worn.body) ctx.drawImage(atlas[`wear_${worn.body}${f}`], x, y);
+    if (worn.neck) ctx.drawImage(atlas[`wear_${worn.neck}${f}`], x, y);
+    if (worn.hat) ctx.drawImage(atlas[`wear_${worn.hat}${f}`], x, y - HAT_ROOM + PETS[species].hatDy);
+  }
+
   function num(text, x, y, color = '#fff7ea') {
     for (const pass of [INK, color]) {
       g.fillStyle = pass;
@@ -129,6 +139,15 @@ export function createRenderer(canvas, atlas) {
     g.fillStyle = '#9a6842'; g.fillRect(0, WALL_H - 5, VIEW_W, 1);
     spr('window', PAD + 6, 8);
     spr('frame', PAD + 54, 8);
+    if (s.pets[0]) {
+      // 액자 안쪽에 첫 번째 친구 얼굴
+      g.save();
+      g.beginPath();
+      g.rect(PAD + 56, 10, 14, 12);
+      g.clip();
+      g.drawImage(atlas[`pet_${s.pets[0].species}_a`], PAD + 53, 10);
+      g.restore();
+    }
     spr('door', PAD + DOOR_X * TILE, WALL_H - 24);
     for (let y = 0; y < s.rows; y++) {
       for (let x = 0; x < COLS; x++) g.drawImage(floors[s.floor[y * COLS + x]], PAD + x * TILE, WALL_H + y * TILE);
@@ -169,20 +188,21 @@ export function createRenderer(canvas, atlas) {
     sprOnTile(`cust${c.look}_${c.up ? 'back_' : ''}${frame}`, c.x, c.y, seated ? -5 + bob : 0);
   }
 
-  function drawDog(d, time) {
-    const flip = d.dir < 0 ? '~' : '';
-    if (d.state === 'nap') {
-      sprOnTile('dog_sleep' + flip, d.x, d.y, -3);
+  function drawPet(p, time) {
+    const pet = petById(p.id);
+    const napping = p.state === 'nap';
+    const moving = p.state === 'walk' || p.state === 'serve';
+    const frame = napping ? 'sleep' : moving && Math.floor(p.walk * 8) % 2 ? 'b' : 'a';
+    const hop = p.boost > 0 && !moving && !napping && Math.floor(time * 6) % 2 ? -1 : 0;
+    const h = atlas[`pet_${pet.species}_${frame}`].height;
+    const x = Math.round(PAD + p.x * TILE), y = Math.round(WALL_H + (p.y + 1) * TILE - h - 1 + hop);
+    petAt(g, x, y, pet.species, frame, pet.wear, p.dir < 0);
+    if (napping) {
       const t = time % 1.6 / 1.6;
       g.globalAlpha = 1 - t;
-      spr('zzz', PAD + d.x * TILE + 11, WALL_H + d.y * TILE - 2 - t * 6);
+      spr('zzz', x + 11, y - 2 - t * 6);
       g.globalAlpha = 1;
-      return;
     }
-    const moving = d.state === 'walk' || d.state === 'serve';
-    const frame = moving && Math.floor(d.walk * 8) % 2 ? 'dog_b' : 'dog_a';
-    const hop = d.boost > 0 && !moving && Math.floor(time * 6) % 2 ? -1 : 0;
-    sprOnTile(frame + flip, d.x, d.y, -1 + hop);
   }
 
   function drawOverlays(s, w, time) {
@@ -190,7 +210,7 @@ export function createRenderer(canvas, atlas) {
       if (it.type !== 'stove' || !it.cook) continue;
       const px = PAD + it.x * TILE, top = WALL_H + (it.y + 1) * TILE - 24;
       if (cookState(it) === 'done') {
-        bubble(px + 8, top + 3 + (Math.floor(time * 3) % 2), RECIPE[it.cook.r].icon);
+        bubble(px + 8, top + 3 + (Math.floor(time * 3) % 2), recipeOf(it.cook.r).icon);
       } else {
         bar(px + 1, top - 2, 14, (Date.now() - it.cook.start) / (it.cook.end - it.cook.start), '#f58a1f');
       }
@@ -201,7 +221,7 @@ export function createRenderer(canvas, atlas) {
       const have = s.stock[c.order] > 0;
       const left = patienceLeft(c);
       const shake = left < 0.25 && Math.floor(time * 10) % 2 ? 1 : 0;
-      const b = bubble(cx + shake, headTop - 1, RECIPE[c.order].icon, have ? 1 : 0.4);
+      const b = bubble(cx + shake, headTop - 1, recipeOf(c.order).icon, have ? 1 : 0.4);
       g.fillStyle = left < 0.25 ? '#e2432c' : '#f58a1f';
       g.fillRect(b.x + 2, b.y + 14, Math.max(1, Math.round(14 * left)), 1);
     }
@@ -259,12 +279,12 @@ export function createRenderer(canvas, atlas) {
           const dx = (c.seat.x - c.seat.tx) * 4, dy = (c.seat.y - c.seat.ty) * 2;
           list.push({
             key: c.seat.ty + 0.7,
-            draw: () => g.drawImage(atlas[RECIPE[c.order].icon], PAD + c.seat.tx * TILE + dx, WALL_H + c.seat.ty * TILE - 6 + dy),
+            draw: () => g.drawImage(atlas[recipeOf(c.order).icon], PAD + c.seat.tx * TILE + dx, WALL_H + c.seat.ty * TILE - 6 + dy),
           });
         }
       }
     }
-    list.push({ key: w.dog.y + 0.56, draw: () => drawDog(w.dog, time) });
+    for (const p of w.pets) list.push({ key: p.y + 0.56, draw: () => drawPet(p, time) });
     list.sort((a, b) => a.key - b.key);
     for (const d of list) d.draw();
 
@@ -286,5 +306,16 @@ export function createRenderer(canvas, atlas) {
   const floorURL = id => floors[id].toDataURL();
   const wallURL = id => makeCanvas(16, 16, c => c.drawImage(walls[id], 0, 0)).toDataURL();
 
-  return { draw, pickItem, floorURL, wallURL };
+  // 화면 밖(버튼, 옷장)에 쓸 동물 그림. worn을 주면 그 옷차림으로, face면 얼굴 쪽만 잘라서.
+  const petURLs = new Map();
+  function petURL(species, worn = {}, face = false) {
+    const key = [species, worn.hat, worn.neck, worn.body, face].join('|');
+    if (!petURLs.has(key)) {
+      const full = makeCanvas(16, 14 + HAT_ROOM, c => petAt(c, 0, HAT_ROOM, species, 'a', worn));
+      petURLs.set(key, (face ? makeCanvas(11, 14, c => c.drawImage(full, -5, 0)) : full).toDataURL());
+    }
+    return petURLs.get(key);
+  }
+
+  return { draw, pickItem, floorURL, wallURL, petURL };
 }

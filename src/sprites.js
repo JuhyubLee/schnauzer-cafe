@@ -290,62 +290,189 @@ def('window', [
   'kkkkkkkkkkkkkkkkkkkkkkkk',
 ], { outline: false });
 
+// 벽 액자. 안쪽(14×12)에는 첫 번째 친구 얼굴을 그려 넣는다(render.js).
+const FRAME_INNER = 'kycccccccccccccCyk';
 def('frame', [
   'kkkkkkkkkkkkkkkkkk',
   'kyyyyyyyyyyyyyyyyk',
-  'kycccccccccccccCyk',
-  'kycGGccccccccGGCyk',
-  'kyGGGGggggggGGGGyk',
-  'kyGGggggggggggGGyk',
-  'kycgllggggggllgCyk',
-  'kycggKggggggKggCyk',
-  'kycggggggggggggCyk',
-  'kycwwwwgKKgwwwwCyk',
-  'kywwwwwwKKwwwwwwyk',
-  'kywwwwwwppwwwwwwyk',
-  'kycwwwwwwwwwwwwCyk',
+  ...Array(11).fill(FRAME_INNER),
   'kycCCCCCCCCCCCCCyk',
   'kyyyyyyyyyyyyyyyyk',
   'kkkkkkkkkkkkkkkkkk',
 ], { outline: false });
 
-// ───── 슈나우저 ─────
+// ───── 동물 친구 ─────
 
-// 몸은 옆모습, 얼굴은 정면: 눈썹과 수염이 보여야 슈나우저로 읽힌다.
-const DOG_BODY = [
+// 몸은 옆모습, 얼굴은 정면. 모든 종이 같은 자리에 머리(7~13열)와 몸(1~9열)을 둬서 옷이 그대로 맞는다.
+// 글자는 역할이다: g 털, G 어두운 털, l 밝은 무늬, s 줄무늬, w 흰 털, e 눈, n 코, p 분홍,
+// f 앞다리, F 뒷다리, q 발. 색은 PET_PAL이 종마다 정한다.
+const PET_ROWS = {
+  schnauzer: [
+    '................',
+    '........G...G...',
+    '.......GGgggGG..',
+    '.......GgggggG..',
+    '..g....gllgllg..',
+    '..g....gegggeg..',
+    '..ggggwwwwnwwww.',
+    '.gggggwwwwwwwww.',
+    '.ggggggwwwpwww..',
+    '.gggggggwwwww...',
+    '.ggggggggg......',
+  ],
+  maltese: [
+    '................',
+    '................',
+    '........ggggg...',
+    '.......ggggggg..',
+    '..g...GgggggggG.',
+    '..g...GgegggegG.',
+    '..ggggGgggngggG.',
+    '.gggggGggggggg..',
+    '.gggggggggpgg...',
+    '.ggggggggggg....',
+    '.ggggggggg......',
+  ],
+  shiba: [
+    '................',
+    '.......g.....g..',
+    '.......gg...gg..',
+    '.gg....ggggggg..',
+    '..g....glggglg..',
+    '..g....gegggeg..',
+    '..gggggwwgngww..',
+    '.gggggwwwwwwww..',
+    '.ggggggwwwpwww..',
+    '.gggggggwwwww...',
+    '.ggggggggg......',
+  ],
+  poodle: [
+    '................',
+    '........ggggg...',
+    '.......GgggggG..',
+    '.g.....GgggggG..',
+    '.gg...GGgggggGG.',
+    '..g...GGegggeGG.',
+    '..ggggGGggnggGG.',
+    '.ggggggGgggggG..',
+    '.gggggggggpgg...',
+    '.ggggggggggg....',
+    '.ggggggggg......',
+  ],
+  cat: [
+    '................',
+    '.......g.....g..',
+    '.......gp...pg..',
+    '.g.....ggsgsgg..',
+    '.g.....ggggggg..',
+    '.g.....gegggeg..',
+    '..gsgsgwwwnwww..',
+    '.ggsgsggwwwww...',
+    '.ggggggggwww....',
+    '.gggggggggg.....',
+    '.ggggggggg......',
+  ],
+};
+const PET_LEGS = {
+  a: ['.ff.F..F.ff.....', '.qq.f..f.qq.....', '................'],
+  b: ['..ff.FF.ff......', '..qq.ff.qq......', '................'],
+  sleep: ['................'], // 다리를 접고 엎드린 모습
+};
+const DARK = '#1e1616', PINK = '#f7a8a0';
+// 종 id → [몸 그림, 색]. data.js의 PETS와 id가 같아야 한다.
+const PET_PAL = {
+  schnauzer: ['schnauzer', { g: '#8f929c', G: '#5f626e', l: '#cfd2d9', s: '#8f929c', w: '#fff7ea', e: DARK, n: DARK, p: PINK, f: '#cfd2d9', F: '#5f626e', q: '#fff7ea' }],
+  maltese: ['maltese', { g: '#fff7ea', G: '#e3d2b8', l: '#fff7ea', s: '#fff7ea', w: '#fff7ea', e: DARK, n: DARK, p: PINK, f: '#fff7ea', F: '#e3d2b8', q: '#fff7ea' }],
+  shiba: ['shiba', { g: '#e8a04c', G: '#c27a2c', l: '#fbe3bf', s: '#e8a04c', w: '#fff3dc', e: DARK, n: DARK, p: PINK, f: '#f0b468', F: '#c27a2c', q: '#fff3dc' }],
+  poodle: ['poodle', { g: '#a9713f', G: '#7a4c28', l: '#c48a55', s: '#a9713f', w: '#a9713f', e: DARK, n: DARK, p: PINK, f: '#a9713f', F: '#7a4c28', q: '#c48a55' }],
+  cheese: ['cat', { g: '#f2a64a', G: '#d07f2a', l: '#f2a64a', s: '#d07f2a', w: '#fff3dc', e: DARK, n: PINK, p: PINK, f: '#f2a64a', F: '#d07f2a', q: '#fff3dc' }],
+  tuxedo: ['cat', { g: '#3a3542', G: '#262229', l: '#3a3542', s: '#3a3542', w: '#fff7ea', e: '#ffd34d', n: PINK, p: PINK, f: '#3a3542', F: '#262229', q: '#fff7ea' }],
+  graycat: ['cat', { g: '#8e97ab', G: '#6c7488', l: '#8e97ab', s: '#8e97ab', w: '#b3bbcb', e: '#2f7d46', n: '#5f626e', p: PINK, f: '#8e97ab', F: '#6c7488', q: '#b3bbcb' }],
+};
+export const PET_IDS = Object.keys(PET_PAL);
+for (const [id, [body, pal]] of Object.entries(PET_PAL)) {
+  def(`pet_${id}_a`, [...PET_ROWS[body], ...PET_LEGS.a], { pal });
+  def(`pet_${id}_b`, [...PET_ROWS[body], ...PET_LEGS.b], { pal });
+  def(`pet_${id}_sleep`, [...PET_ROWS[body], ...PET_LEGS.sleep], { pal: { ...pal, e: pal.G } }); // 눈을 감는다
+}
+
+// ───── 옷 ─────
+// 동물 그림과 같은 16칸 폭으로, 그 위에 겹쳐 그린다.
+
+// 모자: 7줄이 동물 그림의 -3~3번 줄에 놓인다. (머리 꼭대기가 2번 줄)
+const hat = (name, rows) => def(`wear_${name}`, ['................', ...rows, '................']);
+hat('hat_ribbon', [
   '................',
-  '........G...G...',
-  '.......GGgggGG..',
-  '.......GgggggG..',
-  '..g....gllgllg..',
-  '..g....gKgggKg..',
-  '..ggggwwwwKwwww.',
-  '.gggggwwwwwwwww.',
-  '.ggggggwwwpwww..',
-  '.gggggggwwwww...',
-  '.ggggggggg......',
-];
-def('dog_a', [...DOG_BODY,
-  '.ll.G..G.ll.....',
-  '.ww.l..l.ww.....',
   '................',
+  '................',
+  '........oo.oo...',
+  '........ooOoo...',
 ]);
-def('dog_b', [...DOG_BODY,
-  '..ll.GG.ll......',
-  '..ww.ll.ww......',
-  '................',
+hat('hat_chef', [
+  '........wwwww...',
+  '.......wwwwwww..',
+  '.......wwwwwww..',
+  '........wwwww...',
+  '........lllll...',
 ]);
-def('dog_sleep', [
+hat('hat_straw', [
   '................',
-  '................',
-  '....ggggggg.....',
-  '..ggggggggGGg...',
-  '.gggggggggGgllg.',
-  '.gggggggggggKwK.',
-  '.llgglggggwwwww.',
-  '..ll.ll...www...',
-  '................',
+  '.........yyy....',
+  '........yyyyy...',
+  '........ooooo...',
+  '......yyyyyyyYY.',
 ]);
+hat('hat_beret', [
+  '................',
+  '..........r.....',
+  '.........rrr....',
+  '.......rrrrrrr..',
+  '........RRRRR...',
+]);
+hat('hat_crown', [
+  '................',
+  '................',
+  '........y.y.y...',
+  '........yyyyy...',
+  '........yryry...',
+]);
+
+// 목과 옷: 동물 그림의 0~10번 줄과 그대로 겹친다. 몸 안쪽에만 칠하므로 바깥선은 없다.
+const EMPTY = '................';
+const onBody = (name, rows) => def(`wear_${name}`, [...Array(11 - rows.length).fill(EMPTY), ...rows], { outline: false });
+onBody('neck_scarf', ['.......o........', '......oooO......']);
+onBody('neck_bow', ['.......rRr......']);
+onBody('neck_bell', ['......rryr......']);
+onBody('body_stripe', [
+  '..owow..........',
+  '.wowow..........',
+  '.wowowo.........',
+  '.wowowo.........',
+  '.wowowowo.......',
+]);
+onBody('body_apron', [
+  '..wwww..........',
+  '.wwwww..........',
+  '.wwooww.........',
+  '.wwooww.........',
+  '.llllllll.......',
+]);
+onBody('body_raincoat', [
+  '..yyyy..........',
+  '.yyyyy..........',
+  '.yyyyyy.........',
+  '.yyYyyy.........',
+  '.YYYYYYYY.......',
+]);
+onBody('body_sweater', [
+  '..pPpP..........',
+  '.pPpPp..........',
+  '.PpPpPp.........',
+  '.pPpPpP.........',
+  '.PpPpPpPp.......',
+]);
+
+// 가게 얼굴(첫 화면, 액자, 앱 아이콘)에 쓰는 정면 슈나우저
 def('dog_face', [
   '................',
   '..GG........GG..',
@@ -673,22 +800,56 @@ def('hammer', [
   '................',
 ]);
 
+// ───── 나만의 메뉴 아이콘 ─────
+
+// 아이콘 그리기에서 고를 수 있는 색
+export const ICON_COLORS = ['w', 'c', 'y', 'a', 'o', 'r', 'R', 'p', 'n', 'N', 'u', 'b', 'B', 'l', 'g', 'K'];
+export const ICON_SIZE = 16;
+const blank = n => Array(n).fill(EMPTY);
+// 밑그림: 그릇만 그려 두고 음식은 직접 칠한다.
+export const ICON_TEMPLATES = {
+  blank: { name: '빈 칸', rows: blank(16) },
+  bowl: {
+    name: '그릇',
+    rows: [...blank(9),
+      '.wwwwwwwwwwwwww.',
+      '.wwwwwwwwwwwwww.',
+      '..wwwwwwwwwwww..',
+      '..lwwwwwwwwwwl..',
+      '...llwwwwwwll...',
+      '....llllllll....',
+      EMPTY],
+  },
+  plate: { name: '접시', rows: [...blank(10), ...PLATE] },
+  cup: {
+    name: '컵',
+    rows: [...blank(4),
+      '....wwwwwwww....', '....wwwwwwww....', '....wwwwwwww....', '....wwwwwwww....',
+      '....wwwwwwww....', '....wwwwwwww....', '....wwwwwwww....', '....lwwwwwwl....',
+      '.....llllll.....',
+      ...blank(3)],
+  },
+};
+
+// 저장된 아이콘이 그릴 수 있는 모양인지 (16줄 × 16칸, 허용한 색만)
+export function validIcon(rows) {
+  return Array.isArray(rows) && rows.length === ICON_SIZE
+    && rows.every(r => typeof r === 'string' && r.length === ICON_SIZE && [...r].every(ch => ch === '.' || ICON_COLORS.includes(ch)));
+}
+
 // ───── 래스터화 ─────
 
 export const SPRITE_NAMES = Object.keys(RAW);
 
-// {w, h, data: RGBA Uint8ClampedArray}. 브라우저와 아이콘 생성 스크립트가 같이 쓴다.
-export function rasterize(name) {
-  const s = RAW[name];
-  if (!s) throw new Error(`unknown sprite: ${name}`);
-  const rows = s.outline ? withOutline(s.rows) : s.rows;
+// 글자 그림 → {w, h, data: RGBA Uint8ClampedArray}
+function paint(rows, pal, name) {
   const h = rows.length, w = rows[0].length;
   const data = new Uint8ClampedArray(w * h * 4);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const ch = rows[y][x];
       if (ch === '.') continue;
-      const hex = (s.pal && s.pal[ch]) || PAL[ch];
+      const hex = (pal && pal[ch]) || PAL[ch];
       if (!hex) throw new Error(`sprite ${name}: unknown color "${ch}"`);
       const i = (y * w + x) * 4;
       data[i] = parseInt(hex.slice(1, 3), 16);
@@ -700,20 +861,33 @@ export function rasterize(name) {
   return { w, h, data };
 }
 
-// 브라우저 전용: 이름 → canvas. `${name}~` 는 좌우 반전본.
+// 브라우저와 아이콘 생성 스크립트가 같이 쓴다.
+export function rasterize(name) {
+  const s = RAW[name];
+  if (!s) throw new Error(`unknown sprite: ${name}`);
+  return paint(s.outline ? withOutline(s.rows) : s.rows, s.pal, name);
+}
+
+// 브라우저 전용. atlas[name]에 그림을, atlas[name + '~']에 좌우 반전본을 넣는다.
+function put(atlas, name, { w, h, data }) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.getContext('2d').putImageData(new ImageData(data, w, h), 0, 0);
+  atlas[name] = c;
+  const f = document.createElement('canvas');
+  f.width = w; f.height = h;
+  const fx = f.getContext('2d');
+  fx.translate(w, 0); fx.scale(-1, 1); fx.drawImage(c, 0, 0);
+  atlas[name + '~'] = f;
+}
+
 export function buildAtlas() {
   const atlas = {};
-  for (const name of SPRITE_NAMES) {
-    const { w, h, data } = rasterize(name);
-    const c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    c.getContext('2d').putImageData(new ImageData(data, w, h), 0, 0);
-    atlas[name] = c;
-    const f = document.createElement('canvas');
-    f.width = w; f.height = h;
-    const fx = f.getContext('2d');
-    fx.translate(w, 0); fx.scale(-1, 1); fx.drawImage(c, 0, 0);
-    atlas[name + '~'] = f;
-  }
+  for (const name of SPRITE_NAMES) put(atlas, name, rasterize(name));
   return atlas;
+}
+
+// 플레이어가 그린 아이콘을 atlas에 넣는다(다시 그리면 덮어쓴다).
+export function setSprite(atlas, name, rows) {
+  put(atlas, name, paint(withOutline(rows), null, name));
 }
