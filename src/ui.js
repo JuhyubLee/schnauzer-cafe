@@ -2,7 +2,7 @@
 import {
   G, on, level, hint, josa, charm, seatCount, stoves, cookState, itemById,
   startCook, collect, costOf, petDog, enterEdit, exitEdit, storeItem, upgradeStove, upgradeCost,
-  setWall, expand, save, reset,
+  setWall, expand, save, reset, exportSave, importSave,
 } from './game.js';
 import { RECIPES, RECIPE, FURN, FLOORS, WALLS, EXPANSIONS, LEVEL_XP, stoveLimit, fmtTime } from './data.js';
 import { sfx } from './sfx.js';
@@ -188,6 +188,12 @@ export function initUI({ atlas, renderer }) {
         <hr>
         <button type="button" class="btn" data-act="sound">${soundLabel()}</button>
         <hr>
+        <p><b>가게 백업</b></p>
+        <p class="muted">백업 코드를 카톡 '나에게 보내기'에 붙여 두면, 폰을 바꾸거나 저장이 지워져도 가게를 되살릴 수 있어요.</p>
+        <button type="button" class="btn" data-act="backup">백업 코드 복사</button>
+        <label class="field">백업 코드로 되살리기<textarea id="restoreCode" rows="2" placeholder="CAFE1:로 시작하는 코드를 붙여 넣어요" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></label>
+        <button type="button" class="btn" data-act="restore">이 코드로 되살리기</button>
+        <hr>
         <button type="button" class="btn danger" data-act="reset">처음부터 다시 하기</button>
       </div>`, {
       actions: {
@@ -200,6 +206,24 @@ export function initUI({ atlas, renderer }) {
           toast('이름을 바꿨어요');
         },
         sound(el) { s.sound = !s.sound; el.textContent = soundLabel(); save(); sfx('tap'); },
+        async backup() {
+          const code = exportSave();
+          if (await copyText(code)) { toast('백업 코드를 복사했어요. 카톡에 붙여 두세요'); return; }
+          $('restoreCode').value = code;
+          toast('복사가 안 돼요. 아래 칸의 코드를 길게 눌러 복사해 주세요');
+        },
+        restore(el) {
+          const code = $('restoreCode').value;
+          if (!code.trim()) { toast('먼저 백업 코드를 붙여 넣어 주세요'); return; }
+          if (!el.dataset.sure) {
+            el.dataset.sure = '1';
+            el.textContent = '지금 가게를 덮어써요. 한 번 더 누르면 되살려요';
+            return;
+          }
+          if (importSave(code)) { location.reload(); return; }
+          delete el.dataset.sure;
+          el.textContent = '이 코드로 되살리기';
+        },
         reset(el) {
           if (!el.dataset.sure) {
             el.dataset.sure = '1';

@@ -77,6 +77,49 @@ export function reset() {
   load();
 }
 
+// ───── 백업 코드 ─────
+
+const BACKUP_PREFIX = 'CAFE1:';
+const MAX_ROWS = START_ROWS + Object.keys(EXPANSIONS).length;
+
+// 붙여 넣은 백업이 이 게임이 읽을 수 있는 모양인지 본다. 잘린 코드나 엉뚱한 글을 걸러 낸다.
+function usable(s) {
+  const int = Number.isInteger, has = Object.hasOwn;
+  const obj = v => !!v && typeof v === 'object';
+  return obj(s) && s.v === 1
+    && typeof s.shopName === 'string' && typeof s.dogName === 'string'
+    && int(s.coins) && s.coins >= 0 && int(s.xp) && s.xp >= 0 && int(s.nextId)
+    && int(s.rows) && s.rows >= START_ROWS && s.rows <= MAX_ROWS
+    && Array.isArray(s.floor) && s.floor.length === s.rows * COLS && s.floor.every(f => has(FLOORS, f))
+    && has(WALLS, s.wall) && Array.isArray(s.walls) && Array.isArray(s.notes)
+    && obj(s.inv) && obj(s.stock) && obj(s.dog) && obj(s.stats)
+    && Array.isArray(s.items) && s.items.every(i => obj(i) && has(FURN, i.type)
+      && int(i.x) && int(i.y) && i.x >= 0 && i.x < COLS && i.y >= 0 && i.y < s.rows
+      && (i.type !== 'stove' || (STOVE_SPEED[i.lv - 1] > 0 && (!i.cook || has(RECIPE, i.cook.r)))));
+}
+
+export function exportSave() {
+  let bin = '';
+  for (const b of new TextEncoder().encode(JSON.stringify(G.state))) bin += String.fromCharCode(b);
+  return BACKUP_PREFIX + btoa(bin);
+}
+
+// 백업 코드로 가게를 통째로 바꾼다. 성공하면 저장까지 하고 true.
+export function importSave(code) {
+  code = code.replace(/\s+/g, ''); // 메신저가 넣은 줄바꿈
+  let s = null;
+  try {
+    const bin = atob(code.slice(BACKUP_PREFIX.length));
+    s = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, ch => ch.charCodeAt(0))));
+  } catch { /* 아래에서 거른다 */ }
+  if (!code.startsWith(BACKUP_PREFIX) || !usable(s)) return fail('백업 코드가 올바르지 않아요. 처음부터 끝까지 복사했는지 봐 주세요');
+  G.state = s;
+  G.edit = null;
+  G.world = freshWorld();
+  save();
+  return true;
+}
+
 // ───── 조회 ─────
 
 export const level = () => levelOf(G.state.xp);
