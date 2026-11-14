@@ -1,9 +1,24 @@
 {
   "name": "schnauzer-cafe",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "python3 -m http.server 5273 --bind 0.0.0.0",
-    "icons": "node tools/make-icons.mjs"
+    "icons": "node tools/make-icons.mjs",
+    "www": "node tools/build-www.mjs",
+    "app": "npm run www && cap sync"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/ios": "^8.6.2",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/share": "^8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^4.0.0",
+    "@capacitor/cli": "^8.6.2"
   }
 }

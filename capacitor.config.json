@@ -1,0 +1,13 @@
+{
+  "appId": "io.github.juhyublee.kkosunnae",
+  "appName": "꼬순내 분식",
+  "webDir": "www",
+  "backgroundColor": "#ffb35c",
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "native",
+      "initialViewportFitValueHint": "cover",
+      "style": "LIGHT"
+    }
+  }
+}
