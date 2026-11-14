@@ -26,11 +26,23 @@ export const CUSTOM_TIERS = {
 export const MAX_CUSTOM = 6;
 export const CUSTOM_NAME_MAX = 10;
 
+// 계절 한정: 그 달(1~12)에만 살 수 있다. 사 둔 것은 언제든 쓸 수 있다. 달은 기기 시계를 따른다.
+export const SEASONS = {
+  spring: { name: '봄', months: [3, 4, 5] },
+  summer: { name: '여름', months: [6, 7, 8] },
+  autumn: { name: '가을', months: [9, 10, 11] },
+  winter: { name: '겨울', months: [12, 1, 2] },
+  xmas: { name: '크리스마스', months: [11, 12] },
+};
+// 계절 한정이 아니거나(season 없음) 지금이 그 계절이면 살 수 있다.
+export const onSale = (thing, date = new Date()) => !thing.season || SEASONS[thing.season].months.includes(date.getMonth() + 1);
+
 // 꾸미기 목록에서 가구를 나눠 보여 주는 분류
-export const FURN_GROUPS = { seat: '테이블·의자', kitchen: '주방', deco: '장식', mat: '깔개' };
+export const FURN_GROUPS = { seat: '테이블·의자', kitchen: '주방', deco: '장식', light: '조명', mat: '깔개', season: '계절' };
 
 // group: 위의 분류, block: 지나갈 수 없음, charm: 분위기 점수(손님이 더 자주 오고 팁을 준다)
-// table: 옆에 스툴을 붙이면 손님 자리가 되는 가구, light: 밤에 둘레를 밝히는 가구
+// table: 옆에 스툴을 붙이면 손님 자리가 되는 가구, light: 밤에 둘레를 밝히는 빛의 색
+// season: 계절 한정(SEASONS의 이름), blink: 번갈아 보여 줄 두 번째 그림
 export const FURN = {
   stool: { name: '주황 스툴', sprite: 'stool', group: 'seat', price: 25, lv: 1, block: true },
   table: { name: '원목 테이블', sprite: 'table', group: 'seat', price: 60, lv: 1, block: true, table: true },
@@ -40,10 +52,20 @@ export const FURN = {
   stove: { name: '화구', sprite: 'stove', group: 'kitchen', price: 250, lv: 1, block: true },
   plant: { name: '초록 화분', sprite: 'plant', group: 'deco', price: 40, lv: 1, block: true, charm: 2 },
   flower: { name: '주황 꽃 화분', sprite: 'flower', group: 'deco', price: 70, lv: 3, block: true, charm: 3 },
-  lamp: { name: '스탠드 조명', sprite: 'lamp', group: 'deco', price: 120, lv: 4, block: true, charm: 4, light: true },
   shelf: { name: '책장', sprite: 'shelf', group: 'deco', price: 180, lv: 5, block: true, charm: 5 },
+  candle: { name: '양초', sprite: 'candle', group: 'light', price: 50, lv: 1, block: true, charm: 1, light: '#ffc46e' },
+  lantern: { name: '랜턴', sprite: 'lantern', group: 'light', price: 90, lv: 2, block: true, charm: 2, light: '#ffd76e' },
+  lamp_mush: { name: '버섯 무드등', sprite: 'lamp_mush', group: 'light', price: 150, lv: 3, block: true, charm: 3, light: '#ff9c8c' },
+  lamp: { name: '스탠드 조명', sprite: 'lamp', group: 'light', price: 120, lv: 4, block: true, charm: 4, light: '#ffba6e' },
+  lamp_mint: { name: '민트 스탠드 조명', sprite: 'lamp_mint', group: 'light', price: 200, lv: 6, block: true, charm: 4, light: '#9bdccb' },
   rug: { name: '주황 러그', sprite: 'rug', group: 'mat', price: 30, lv: 2, block: false, charm: 1 },
   dogbed: { name: '폭신 방석', sprite: 'dogbed', group: 'mat', price: 90, lv: 2, block: false, charm: 2 },
+  xmas_tree: { name: '크리스마스 트리', sprite: 'xmas_tree', blink: 'xmas_tree_b', group: 'season', season: 'xmas', price: 300, lv: 1, block: true, charm: 6, light: '#ffd76e' },
+  gift: { name: '선물 상자', sprite: 'gift', group: 'season', season: 'xmas', price: 80, lv: 1, block: true, charm: 2 },
+  snowman: { name: '눈사람', sprite: 'snowman', group: 'season', season: 'winter', price: 120, lv: 1, block: true, charm: 3 },
+  blossom: { name: '벚꽃 화분', sprite: 'blossom', group: 'season', season: 'spring', price: 90, lv: 1, block: true, charm: 3 },
+  fan: { name: '선풍기', sprite: 'fan', group: 'season', season: 'summer', price: 100, lv: 1, block: true, charm: 2 },
+  pumpkin: { name: '호박 장식', sprite: 'pumpkin', group: 'season', season: 'autumn', price: 60, lv: 1, block: true, charm: 2 },
 };
 
 // 동물 친구. id는 sprites.js의 PET_PAL과 같아야 한다.
@@ -86,6 +108,9 @@ export const WEAR = {
   body_stripe: { name: '줄무늬 티', slot: 'body', price: 150 },
   body_sweater: { name: '분홍 스웨터', slot: 'body', price: 250 },
   body_raincoat: { name: '노란 우비', slot: 'body', price: 300 },
+  hat_santa: { name: '산타 모자', slot: 'hat', price: 200, season: 'xmas' },
+  hat_antler: { name: '루돌프 머리띠', slot: 'hat', price: 180, season: 'xmas' },
+  body_santa: { name: '산타 옷', slot: 'body', price: 300, season: 'xmas' },
 };
 
 // 레벨별 화구 최대 개수: [레벨, 개수]

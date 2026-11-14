@@ -2,7 +2,7 @@
 import {
   RECIPES, RECIPE, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FURN_GROUPS, FLOORS, WALLS,
   PETS, PET_SLOTS, PET_NAME_MAX, WEAR, START_ROWS, START_COLS, START_DOOR, EXPANSIONS, WIDENINGS, EXPAND_DIRS,
-  STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, levelOf, stoveLimit,
+  STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, levelOf, stoveLimit, onSale,
 } from './data.js';
 import { CUSTOMER_LOOKS, validIcon } from './sprites.js';
 import { mirror } from './device.js';
@@ -263,7 +263,7 @@ export function hint() {
 export function unlocksAt(lv) {
   const out = [];
   for (const r of RECIPES) if (r.lv === lv) out.push({ icon: r.icon, text: `새 메뉴: ${r.name}` });
-  for (const f of Object.values(FURN)) if (f.lv === lv && lv > 1) out.push({ icon: f.sprite, text: `새 가구: ${f.name}` });
+  for (const f of Object.values(FURN)) if (f.lv === lv && lv > 1 && !f.season) out.push({ icon: f.sprite, text: `새 가구: ${f.name}` });
   for (const f of Object.values(FLOORS)) if (f.lv === lv && lv > 1) out.push({ text: `새 바닥: ${f.name}` });
   for (const w of Object.values(WALLS)) if (w.lv === lv && lv > 1) out.push({ text: `새 벽지: ${w.name}` });
   for (const t of Object.values(CUSTOM_TIERS)) if (t.lv === lv && lv > 1) out.push({ text: `나만의 메뉴: ${t.name} 등급` });
@@ -551,6 +551,7 @@ export function setSpecies(id, species) {
 export function wear(petId, itemId) {
   const s = G.state, pet = petById(petId), item = WEAR[itemId];
   if (!s.closet.includes(itemId)) {
+    if (!onSale(item)) return fail('지금은 팔지 않는 계절 한정 옷이에요');
     if (s.coins < item.price) return fail('코인이 모자라요');
     s.coins -= item.price;
     s.closet.push(itemId);
@@ -780,7 +781,9 @@ function expand(dir) {
 export function askPlace(type, x, y) {
   const s = G.state;
   if (s.inv[type] > 0) return place(type, x, y);
-  const err = placeError(type, x, y) || stoveLimitError(type) || (s.coins < FURN[type].price ? '코인이 모자라요' : null);
+  const err = placeError(type, x, y) || stoveLimitError(type)
+    || (!onSale(FURN[type]) ? '지금은 팔지 않는 계절 한정 가구예요' : null)
+    || (s.coins < FURN[type].price ? '코인이 모자라요' : null);
   if (err) return fail(err);
   G.edit.pending = { kind: 'furn', type, x, y };
   return true;

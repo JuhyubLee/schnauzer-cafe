@@ -1,6 +1,6 @@
 // 동물 친구 창: 쓰다듬기, 옷장, 이름과 모습 바꾸기, 새 친구 데려오기.
 import { G, level, petById, petPet, wear, renamePet, setSpecies, adopt, adoptSlot, save } from './game.js';
-import { PETS, PET_NAME_MAX, WEAR, WEAR_SLOTS } from './data.js';
+import { PETS, PET_NAME_MAX, WEAR, WEAR_SLOTS, SEASONS, onSale } from './data.js';
 import { $, esc, setText } from './dom.js';
 import { sfx } from './sfx.js';
 
@@ -28,9 +28,11 @@ export function createPetUI({ icon, coin, toast, openSheet, renderer, refresh })
 
     const closet = Object.entries(WEAR_SLOTS).map(([slot, slotName]) => {
       const cards = Object.entries(WEAR).filter(([, w]) => w.slot === slot).map(([wid, w]) => {
-        const wearing = pet.wear[slot] === wid, buying = trying === wid;
-        const sub = wearing ? '입는 중' : s.closet.includes(wid) ? '입히기' : buying ? `${coin(w.price)}<br>구매 확정` : coin(w.price);
-        return `<button type="button" class="card ${wearing ? 'on' : buying ? 'try' : ''}" data-act="wear" data-id="${wid}">
+        const wearing = pet.wear[slot] === wid, owned = s.closet.includes(wid), buying = trying === wid;
+        const off = !owned && !onSale(w); // 계절 한정 옷은 그 계절에만 살 수 있다
+        const sub = wearing ? '입는 중' : owned ? '입히기' : off ? `${SEASONS[w.season].name} 한정`
+          : buying ? `${coin(w.price)}<br>구매 확정` : coin(w.price);
+        return `<button type="button" class="card ${wearing ? 'on' : buying ? 'try' : ''}" data-act="wear" data-id="${wid}" ${off ? 'disabled' : ''}>
           <img class="px" src="${renderer.petURL(pet.species, { ...pet.wear, [slot]: wid })}" alt=""><b>${w.name}</b><small>${sub}</small></button>`;
       }).join('');
       return `<p><b>${slotName}</b></p><div class="hscroll">${cards}</div>`;

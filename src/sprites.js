@@ -133,7 +133,7 @@ def('stove_on', [...STOVE_TOP,
   'kokayyaayyaaykok',
   ...STOVE_BOTTOM], { outline: false });
 
-def('plant', [
+const PLANT_ROWS = [
   '................',
   '......nn........',
   '.....nNnn.nn....',
@@ -155,7 +155,9 @@ def('plant', [
   '.....ooooOO.....',
   '.....OOOOOO.....',
   '................',
-]);
+];
+def('plant', PLANT_ROWS);
+def('blossom', PLANT_ROWS, { pal: { n: PAL.p, N: '#fbd0dc' } }); // 봄 한정: 벚꽃 화분
 
 def('flower', [
   '................',
@@ -180,7 +182,7 @@ def('flower', [
   '................',
 ]);
 
-def('lamp', [
+const LAMP_ROWS = [
   '................',
   '.....aaaaaa.....',
   '....aaoooooo....',
@@ -203,6 +205,54 @@ def('lamp', [
   '.......BB.......',
   '.....BBBBBB.....',
   '....BBBBBBBB....',
+  '................',
+];
+def('lamp', LAMP_ROWS);
+def('lamp_mint', LAMP_ROWS, { pal: { a: '#d6f5ec', o: PAL.m, O: PAL.M } });
+
+def('lamp_mush', [
+  '................',
+  '.....rrrrrr.....',
+  '....rrwrrrrr....',
+  '...rrrrrrwrrr...',
+  '...rwrrrrrrrr...',
+  '...rrrrrwrrrR...',
+  '....RRRRRRRR....',
+  '......cccc......',
+  '......cccc......',
+  '......cccC......',
+  '.....ccccCC.....',
+  '................',
+]);
+
+def('lantern', [
+  '................',
+  '.......gg.......',
+  '......gggg......',
+  '.....GGGGGG.....',
+  '.....lyyyyl.....',
+  '.....lyaayl.....',
+  '.....lyaayl.....',
+  '.....lyaayl.....',
+  '.....lyyyyl.....',
+  '.....GGGGGG.....',
+  '....GGGGGGGG....',
+  '................',
+]);
+
+def('candle', [
+  '................',
+  '.......y........',
+  '......yay.......',
+  '......yay.......',
+  '.......B........',
+  '......cccc......',
+  '......cwcc......',
+  '......cwcc......',
+  '......cccc......',
+  '......cccC......',
+  '....YYYYYYYY....',
+  '.....YYYYYY.....',
   '................',
 ]);
 
@@ -265,6 +315,110 @@ def('dogbed', [
   '..OOOOOOOOOOOO..',
   '................',
   '................',
+  '................',
+]);
+
+// ───── 계절 한정 가구 ─────
+
+// 트리의 전구(r, y, u)는 색을 서로 바꾼 그림(xmas_tree_b)과 번갈아 보여서 깜빡인다.
+const XMAS_TREE_ROWS = [
+  '................',
+  '.......aa.......',
+  '......aYYa......',
+  '.......aa.......',
+  '.......nn.......',
+  '......nnnn......',
+  '.....nnrnnn.....',
+  '....nnnnnnun....',
+  '.....nNnnnn.....',
+  '....nnnnynnn....',
+  '...nnrnnnnnnn...',
+  '..nnnnnnNnnunn..',
+  '....nNnnnnnn....',
+  '...nnnynnnnrnn..',
+  '..nnnnnnnNnnnnn.',
+  '.nnunnnnnnnnynn.',
+  '.nnnnnrnnnNnnnn.',
+  '.......BB.......',
+  '.......BB.......',
+  '.....aooooO.....',
+  '.....ooooOO.....',
+  '......OOOO......',
+  '................',
+];
+def('xmas_tree', XMAS_TREE_ROWS);
+def('xmas_tree_b', XMAS_TREE_ROWS, { pal: { r: PAL.y, y: PAL.u, u: PAL.r } });
+
+def('gift', [
+  '................',
+  '................',
+  '.....yy..yy.....',
+  '....y..yy..y....',
+  '.....yyyyyy.....',
+  '...rrrryyrrrr...',
+  '...rrrryyrrrr...',
+  '...RRRRyyRRRR...',
+  '...rrrryyrrrr...',
+  '...rrrryyrrrr...',
+  '...rrrryyrrrr...',
+  '...RRRRYYRRRR...',
+  '................',
+  '................',
+]);
+
+def('snowman', [
+  '................',
+  '......GGGG......',
+  '......GGGG......',
+  '.....GGGGGG.....',
+  '......wwww......',
+  '.....wewwew.....',
+  '.....wwwoow.....',
+  '.....wwwwww.....',
+  '.....rrrrrr.....',
+  '......rr........',
+  '....wwwwwwww....',
+  '...wwwwGwwwww...',
+  '...wwwwwwwwww...',
+  '...wwwwGwwwww...',
+  '...wwwwwwwwww...',
+  '....wlwwwwlw....',
+  '.....llllll.....',
+  '................',
+]);
+
+def('pumpkin', [
+  '................',
+  '................',
+  '.......NN.......',
+  '.......N........',
+  '....ooooNooo....',
+  '...oaoooooooO...',
+  '..oaooOoooOooO..',
+  '..oaooOoooOooO..',
+  '..ooooOoooOooO..',
+  '..ooooOoooOooO..',
+  '..ooooOoooOooO..',
+  '...ooooOoOooO...',
+  '....OOOOOOOO....',
+  '................',
+]);
+
+def('fan', [
+  '................',
+  '.....llllll.....',
+  '....lwuwwuwl....',
+  '...lwuuwwuuwl...',
+  '...lwwugguwwl...',
+  '...lwwugguwwl...',
+  '...lwuuwwuuwl...',
+  '....lwuwwuwl....',
+  '.....llllll.....',
+  '.......gg.......',
+  '.......gg.......',
+  '.......gg.......',
+  '.....GGGGGG.....',
+  '....GGGGGGGG....',
   '................',
 ]);
 
@@ -498,6 +652,20 @@ hat('hat_crown', [
   '........yyyyy...',
   '........yryry...',
 ]);
+hat('hat_santa', [
+  '..........r.....',
+  '.........rrr....',
+  '........rrrrrw..',
+  '........rrrrr...',
+  '.......wwwwwww..',
+]);
+hat('hat_antler', [
+  '................',
+  '.......b.b.b.b..',
+  '........bb.bb...',
+  '.........b.b....',
+  '........rrrrr...',
+]);
 
 // 목과 옷: 동물 그림의 0~10번 줄과 그대로 겹친다. 몸 안쪽에만 칠하므로 바깥선은 없다.
 const EMPTY = '................';
@@ -532,6 +700,13 @@ onBody('body_sweater', [
   '.PpPpPp.........',
   '.pPpPpP.........',
   '.PpPpPpPp.......',
+]);
+onBody('body_santa', [
+  '..rrrr..........',
+  '.rrrrr..........',
+  '.rrrrrr.........',
+  '.kkykkk.........',
+  '.wwwwwwww.......',
 ]);
 
 // 가게 얼굴(첫 화면, 액자, 앱 아이콘)에 쓰는 정면 슈나우저

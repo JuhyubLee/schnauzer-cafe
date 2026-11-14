@@ -6,7 +6,8 @@ import {
   askWall, askExpand, askUpgrade, pendingInfo, confirmPending, save, reset, startGame, exportSave, importSave,
 } from './game.js';
 import {
-  FURN, FURN_GROUPS, FLOORS, WALLS, EXPAND_DIRS, LEVEL_XP, PETS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL, stoveLimit, fmtTime,
+  FURN, FURN_GROUPS, FLOORS, WALLS, SEASONS, EXPAND_DIRS, LEVEL_XP, PETS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL,
+  stoveLimit, fmtTime, onSale,
 } from './data.js';
 import { $, esc, setText, setHTML, setSrc, copyText } from './dom.js';
 import { share } from './device.js';
@@ -279,11 +280,14 @@ export function initUI({ atlas, renderer }) {
   function editCards() {
     const s = G.state, e = G.edit, lv = level();
     if (e.tab === 'furn') {
-      return Object.entries(FURN).filter(([, f]) => f.group === e.group).map(([id, f]) => {
+      const list = Object.entries(FURN).filter(([, f]) => f.group === e.group);
+      if (e.group === 'season') list.sort((a, b) => onSale(b[1]) - onSale(a[1])); // 지금 파는 것을 앞에
+      return list.map(([id, f]) => {
         const locked = f.lv > lv, have = s.inv[id] || 0;
         const full = id === 'stove' && stoves().length >= stoveLimit(lv);
-        const sub = locked ? `Lv ${f.lv}` : have ? `보관 ${have}개` : full ? '지금은 최대' : coin(f.price);
-        return `<button type="button" class="card ${e.place === id ? 'on' : ''}" data-act="furn" data-id="${id}" ${locked || full ? 'disabled' : ''}>
+        const off = !have && !onSale(f); // 계절이 아니면 새로 살 수 없다. 보관해 둔 것은 놓을 수 있다.
+        const sub = off ? `${SEASONS[f.season].name} 한정` : locked ? `Lv ${f.lv}` : have ? `보관 ${have}개` : full ? '지금은 최대' : coin(f.price);
+        return `<button type="button" class="card ${e.place === id ? 'on' : ''}" data-act="furn" data-id="${id}" ${locked || full || off ? 'disabled' : ''}>
           <img class="px" src="${icon(f.sprite)}" alt=""><b>${f.name}</b><small>${sub}</small></button>`;
       }).join('');
     }

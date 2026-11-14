@@ -128,16 +128,23 @@ export function createRenderer(canvas, atlas) {
   // 벽지는 가장 넓은 가게 폭으로 만들어 두고 왼쪽부터 필요한 만큼만 쓴다.
   const walls = Object.fromEntries(Object.keys(WALLS).map(id =>
     [id, makeCanvas(viewW(MAX_COLS), WALL_H - 5, c => WALL_PAINT[id](c, viewW(MAX_COLS), WALL_H - 5))]));
-  // 원을 세 겹 겹쳐서 가운데가 더 밝은 빛
-  const lampGlow = makeCanvas(GLOW_R * 2 + 1, GLOW_R * 2 + 1, c => {
-    for (const [r, alpha] of [[GLOW_R, 0.08], [14, 0.1], [7, 0.1]]) {
-      c.fillStyle = `rgba(255,186,110,${alpha})`;
-      for (let y = -r; y <= r; y++) {
-        const half = Math.floor(Math.sqrt(r * r - y * y));
-        c.fillRect(GLOW_R - half, GLOW_R + y, half * 2 + 1, 1);
-      }
+  // 밤에 조명 둘레를 밝히는 빛. 원을 세 겹 겹쳐서 가운데가 더 밝다. 빛 색마다 한 장씩 만들어 둔다.
+  const glows = new Map();
+  function glowOf(color) {
+    if (!glows.has(color)) {
+      const [red, green, blue] = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16));
+      glows.set(color, makeCanvas(GLOW_R * 2 + 1, GLOW_R * 2 + 1, c => {
+        for (const [r, alpha] of [[GLOW_R, 0.08], [14, 0.1], [7, 0.1]]) {
+          c.fillStyle = `rgba(${red},${green},${blue},${alpha})`;
+          for (let y = -r; y <= r; y++) {
+            const half = Math.floor(Math.sqrt(r * r - y * y));
+            c.fillRect(GLOW_R - half, GLOW_R + y, half * 2 + 1, 1);
+          }
+        }
+      }));
     }
-  });
+    return glows.get(color);
+  }
 
   // 하늘 모습은 1초에 한 번만 다시 계산한다.
   let sky = skyAt(new Date()), skyMs = Date.now();
@@ -277,7 +284,11 @@ export function createRenderer(canvas, atlas) {
     g.globalCompositeOperation = 'lighter';
     g.globalAlpha = sky.dark;
     for (const it of s.items) {
-      if (FURN[it.type].light) g.drawImage(lampGlow, PAD + it.x * TILE + 8 - GLOW_R, WALL_H + (it.y + 1) * TILE - 18 - GLOW_R);
+      const f = FURN[it.type];
+      if (!f.light) continue;
+      // 빛은 그림 윗부분(전등갓, 불꽃)에서 퍼진다.
+      const top = WALL_H + (it.y + 1) * TILE - atlas[f.sprite].height;
+      g.drawImage(glowOf(f.light), PAD + it.x * TILE + 8 - GLOW_R, top + 5 - GLOW_R);
     }
     g.globalAlpha = 1;
     g.globalCompositeOperation = 'source-over';
@@ -285,7 +296,10 @@ export function createRenderer(canvas, atlas) {
 
   function drawItem(it, time) {
     const f = FURN[it.type];
-    if (it.type !== 'stove') { sprOnTile(f.sprite, it.x, it.y); return; }
+    if (it.type !== 'stove') {
+      sprOnTile(f.blink && Math.floor(time * 1.5) % 2 ? f.blink : f.sprite, it.x, it.y);
+      return;
+    }
     const state = cookState(it);
     sprOnTile(state === 'cooking' ? 'stove_on' : 'stove', it.x, it.y);
     if (state === 'cooking') {
