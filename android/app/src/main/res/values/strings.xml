@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">꼬순내 분식</string>
     <string name="title_activity_main">꼬순내 분식</string>
-    <string name="package_name">io.github.juhyublee.kkosunnae</string>
-    <string name="custom_url_scheme">io.github.juhyublee.kkosunnae</string>
+    <string name="package_name">com.juhyub.kkosunnae</string>
+    <string name="custom_url_scheme">com.juhyub.kkosunnae</string>
 </resources>

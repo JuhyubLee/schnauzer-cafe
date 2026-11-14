@@ -7,10 +7,10 @@ def keystore = new Properties()
 if (keystoreFile.exists()) keystoreFile.withInputStream { keystore.load(it) }
 
 android {
-    namespace = "io.github.juhyublee.kkosunnae"
+    namespace = "com.juhyub.kkosunnae"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "io.github.juhyublee.kkosunnae"
+        applicationId "com.juhyub.kkosunnae"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // 스토어에 올릴 때마다 versionCode를 1씩 올린다. versionName은 src/data.js의 APP_VERSION과 맞춘다.

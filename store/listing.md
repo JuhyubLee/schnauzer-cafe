@@ -7,13 +7,14 @@
 | 항목 | 값 |
 |---|---|
 | 앱 이름 | 꼬순내 분식 |
-| 패키지 이름 / 번들 ID | `io.github.juhyublee.kkosunnae` |
+| 패키지 이름 / 번들 ID | `com.juhyub.kkosunnae` |
 | 버전 | 1.0.0 (Android versionCode 1, iOS 빌드 1) |
 | 분류 | 게임 > 시뮬레이션 |
 | 가격 | 무료, 광고 없음, 인앱 결제 없음 |
 | 기본 언어 | 한국어 |
 | 개인정보 처리방침 | https://juhyublee.github.io/schnauzer-cafe/privacy.html |
-| 웹사이트 / 지원 주소 | https://juhyublee.github.io/schnauzer-cafe/ |
+| 웹사이트 | https://juhyublee.github.io/schnauzer-cafe/ |
+| 지원 주소 | https://github.com/JuhyubLee/schnauzer-cafe/issues |
 | 연락 이메일 | 개발자 계정 이메일 (콘솔에서 입력) |
 
 ## Google Play

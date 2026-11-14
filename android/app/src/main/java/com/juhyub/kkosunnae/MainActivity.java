@@ -1,4 +1,4 @@
-package io.github.juhyublee.kkosunnae;
+package com.juhyub.kkosunnae;
 
 import com.getcapacitor.BridgeActivity;
 
