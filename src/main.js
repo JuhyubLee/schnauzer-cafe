@@ -5,7 +5,7 @@ import {
 } from './game.js';
 import { fmtTime } from './data.js';
 import { buildAtlas, setSprite } from './sprites.js';
-import { createRenderer, VIEW_W, viewH, tileAt, TILE, PAD, WALL_H, PHOTO_RECT } from './render.js';
+import { createRenderer, viewW, viewH, tileAt, TILE, PAD, WALL_H, photoRect } from './render.js';
 import { initUI } from './ui.js';
 import { sfx } from './sfx.js';
 import { syncMusic } from './music.js';
@@ -31,7 +31,7 @@ const ui = initUI({ atlas, renderer });
 
 // ── 화면 크기: 픽셀이 뭉개지지 않게 기기 픽셀 기준 정수배로 맞춘다 ──
 function fit() {
-  const w = VIEW_W, h = viewH(G.state.rows), dpr = window.devicePixelRatio || 1;
+  const w = viewW(G.state.cols), h = viewH(G.state.rows), dpr = window.devicePixelRatio || 1;
   let scale = Math.min((stage.clientWidth - 12) * dpr / w, (stage.clientHeight - 12) * dpr / h);
   if (scale >= 2) scale = Math.floor(scale);
   canvas.style.width = `${(w * scale) / dpr}px`;
@@ -81,7 +81,8 @@ function playTap(p) {
 
   if (G.visit) return; // 구경 중에는 남의 화구와 액자를 건드리지 않는다
   // 벽의 큰 액자: 누르기 쉽게 둘레 3px까지 받는다
-  if (inRect(p, PHOTO_RECT.x - 3, PHOTO_RECT.y - 3, PHOTO_RECT.w + 6, PHOTO_RECT.h + 6)) { sfx('tap'); ui.openPhoto(); return; }
+  const frame = photoRect(G.state);
+  if (inRect(p, frame.x - 3, frame.y - 3, frame.w + 6, frame.h + 6)) { sfx('tap'); ui.openPhoto(); return; }
   const it = renderer.pickItem(p.x, p.y);
   if (it?.type !== 'stove') return;
   if (cookState(it) === 'idle') { sfx('tap'); ui.openCook(it.id); }

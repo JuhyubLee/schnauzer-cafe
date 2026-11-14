@@ -118,8 +118,11 @@ export const PHOTO_W = 22;
 export const PHOTO_H = 18;
 export const PHOTO_MAX_CHARS = 12000;
 
+// 처음 가게의 크기와 문 자리(왼쪽에서 0부터 센 칸)
 export const START_ROWS = 6;
-// 확장: 현재 줄 수 → 다음 줄을 여는 조건
+export const START_COLS = 8;
+export const START_DOOR = 6;
+// 위아래로 넓히기: 현재 줄 수 → 다음 줄을 여는 조건
 export const EXPANSIONS = {
   6: { lv: 2, price: 200 },
   7: { lv: 3, price: 500 },
@@ -127,6 +130,12 @@ export const EXPANSIONS = {
   9: { lv: 7, price: 3000 },
   10: { lv: 9, price: 7000 },
 };
+// 옆으로 넓히기: 현재 칸 수 → 다음 칸을 여는 조건. 가게 전체가 폰 화면에 한 번에 들어오도록 두 칸까지만 늘린다.
+export const WIDENINGS = {
+  8: { lv: 6, price: 2500 },
+  9: { lv: 10, price: 8000 },
+};
+export const EXPAND_DIRS = { up: '위로', down: '아래로', left: '왼쪽으로', right: '오른쪽으로' };
 
 // 누적 경험치 기준. LEVEL_XP[i] 이상이면 레벨 i+1.
 export const LEVEL_XP = [0, 20, 60, 140, 280, 500, 850, 1400, 2200, 3400, 5200, 8000];

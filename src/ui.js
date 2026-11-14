@@ -2,11 +2,11 @@
 // 친구(옷장)와 나만의 메뉴 화면은 ui-pet.js, ui-menu.js에 있다.
 import {
   G, on, level, hint, charm, seatCount, stoves, cookState, itemById, recipeOf, allRecipes,
-  startCook, collect, costOf, enterEdit, exitEdit, storeItem, upgradeCost,
+  startCook, collect, costOf, enterEdit, exitEdit, storeItem, upgradeCost, expandCfg,
   askWall, askExpand, askUpgrade, pendingInfo, confirmPending, save, reset, startGame, exportSave, importSave,
 } from './game.js';
 import {
-  FURN, FURN_GROUPS, FLOORS, WALLS, EXPANSIONS, LEVEL_XP, PETS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL, stoveLimit, fmtTime,
+  FURN, FURN_GROUPS, FLOORS, WALLS, EXPAND_DIRS, LEVEL_XP, PETS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL, stoveLimit, fmtTime,
 } from './data.js';
 import { $, esc, setText, setHTML, setSrc, copyText } from './dom.js';
 import { share } from './device.js';
@@ -306,11 +306,15 @@ export function initUI({ atlas, renderer }) {
           <img class="px" src="${renderer.wallURL(id)}" alt=""><b>${w.name}</b><small>${sub}</small></button>`;
       }).join('');
     }
-    const cfg = EXPANSIONS[s.rows];
-    if (!cfg) return '<div class="card wide"><b>가게를 끝까지 넓혔어요</b></div>';
-    return lv < cfg.lv
-      ? `<button type="button" class="card wide" disabled><b>가게 한 줄 넓히기</b><small>레벨 ${cfg.lv}부터</small></button>`
-      : `<button type="button" class="card wide ${e.pending?.kind === 'expand' ? 'on' : ''}" data-act="expand"><b>가게 한 줄 넓히기</b><small>${coin(cfg.price)}</small></button>`;
+    // 넓힐 쪽을 고른다. 위·아래는 줄 수, 왼쪽·오른쪽은 칸 수가 늘어난다.
+    const arrows = { up: 'arrow_up', down: 'arrow_down', left: 'arrow_right~', right: 'arrow_right' };
+    return Object.entries(EXPAND_DIRS).map(([dir, name]) => {
+      const cfg = expandCfg(dir);
+      const sub = !cfg ? '다 넓혔어요' : lv < cfg.lv ? `Lv ${cfg.lv}` : coin(cfg.price);
+      const picked = e.pending?.kind === 'expand' && e.pending.dir === dir;
+      return `<button type="button" class="card ${picked ? 'on' : ''}" data-act="expand" data-id="${dir}" ${!cfg || lv < cfg.lv ? 'disabled' : ''}>
+        <img class="px" src="${icon(arrows[dir])}" alt=""><b>${name}</b><small>${sub}</small></button>`;
+    }).join('');
   }
 
   function editInfo() {
@@ -334,6 +338,7 @@ export function initUI({ atlas, renderer }) {
     }
     if (e.place) return `<span class="grow"><b>${FURN[e.place].name}</b> · 놓을 칸을 누르세요</span>${stop}`;
     if (e.floor) return `<span class="grow"><b>${FLOORS[e.floor].name}</b> · 칠할 칸을 누르거나 문질러요</span>${stop}`;
+    if (e.tab === 'expand') return `<span class="grow">넓힐 쪽을 골라 주세요</span><span>가로 ${G.state.cols}칸 · 세로 ${G.state.rows}줄</span>`;
     return `<span class="grow">가구를 누르면 옮기거나 보관할 수 있어요</span><span>분위기 ${charm()} · 자리 ${seatCount()}개</span>`;
   }
 
@@ -374,7 +379,7 @@ export function initUI({ atlas, renderer }) {
     if (el.dataset.act === 'furn') Object.assign(e, { place: e.place === id ? null : id, sel: null, pending: null });
     else if (el.dataset.act === 'floor') Object.assign(e, { floor: e.floor === id ? null : id, sel: null, pending: null });
     else if (el.dataset.act === 'wall') askWall(id);
-    else if (el.dataset.act === 'expand') askExpand();
+    else if (el.dataset.act === 'expand') askExpand(id);
     else if (el.dataset.act === 'photo') { e.pending = null; photoUI.open(); }
     sfx('tap');
     renderEdit();

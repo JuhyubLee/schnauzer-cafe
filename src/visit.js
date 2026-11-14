@@ -1,10 +1,10 @@
 // 놀러 가기: 서버 없이 '초대장'을 주고받아 서로의 가게를 구경한다.
 // 초대장은 가게 모습만 담은 글(코드)이고, 주소 뒤에 붙여 링크로 보낸다.
 // 코인, 재고, 의견은 담지 않는다. 받은 초대장은 남이 만든 글이므로 하나하나 검사해서 쓴다.
-import { G, level, enterVisit, leaveVisit, save, COLS, DOOR_X, MAX_ROWS } from './game.js';
+import { G, level, enterVisit, leaveVisit, save, MAX_ROWS, MAX_COLS } from './game.js';
 import {
   RECIPES, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FLOORS, WALLS, PETS, PET_SLOTS, PET_NAME_MAX,
-  WEAR, START_ROWS, LEVEL_XP, VISIT_GIFT, GIFTS_PER_DAY, STOVE_SPEED, SITE_URL,
+  WEAR, START_ROWS, START_COLS, START_DOOR, LEVEL_XP, VISIT_GIFT, GIFTS_PER_DAY, STOVE_SPEED, SITE_URL,
 } from './data.js';
 import { validIcon } from './sprites.js';
 import { mirror } from './device.js';
@@ -53,6 +53,8 @@ export function makeSnapshot() {
     n: s.shopName,
     l: level(),
     r: s.rows,
+    k: s.cols,
+    d: s.door,
     w: s.wall,
     f: s.floor,
     i: s.items.map(it => (it.type === 'stove' ? [it.type, it.x, it.y, it.lv] : [it.type, it.x, it.y])),
@@ -98,18 +100,21 @@ function sanitize(raw) {
   if (!sid || !name) return null;
   if (!int(raw.l) || raw.l < 1 || raw.l > LEVEL_XP.length) return null;
   if (!int(raw.r) || raw.r < START_ROWS || raw.r > MAX_ROWS) return null;
+  // 가로 칸 수(k)와 문 자리(d)가 없는 초대장은 옆으로 넓히기가 생기기 전에 만든 것이다.
+  const cols = raw.k ?? START_COLS, door = raw.d ?? START_DOOR;
+  if (!int(cols) || cols < START_COLS || cols > MAX_COLS || !int(door) || door < 0 || door >= cols) return null;
   if (!has(WALLS, raw.w)) return null;
-  if (!Array.isArray(raw.f) || raw.f.length !== raw.r * COLS || !raw.f.every(f => has(FLOORS, f))) return null;
+  if (!Array.isArray(raw.f) || raw.f.length !== raw.r * cols || !raw.f.every(f => has(FLOORS, f))) return null;
 
-  if (!Array.isArray(raw.i) || raw.i.length > raw.r * COLS) return null;
+  if (!Array.isArray(raw.i) || raw.i.length > raw.r * cols) return null;
   const taken = new Set(), items = [];
   for (const it of raw.i) {
     if (!Array.isArray(it)) return null;
     const [type, x, y, lv = 1] = it;
-    if (!has(FURN, type) || !int(x) || !int(y) || x < 0 || x >= COLS || y < 0 || y >= raw.r) return null;
+    if (!has(FURN, type) || !int(x) || !int(y) || x < 0 || x >= cols || y < 0 || y >= raw.r) return null;
     if (type === 'stove' && !(STOVE_SPEED[lv - 1] > 0)) return null;
-    if (taken.has(y * COLS + x) || (FURN[type].block && x === DOOR_X && y === 0)) return null;
-    taken.add(y * COLS + x);
+    if (taken.has(y * cols + x) || (FURN[type].block && x === door && y === 0)) return null;
+    taken.add(y * cols + x);
     items.push(type === 'stove' ? [type, x, y, lv] : [type, x, y]);
   }
 
@@ -133,7 +138,7 @@ function sanitize(raw) {
     if (!str(menu, CUSTOM_NAME_MAX) || !has(CUSTOM_TIERS, tier) || !validIcon(rows)) return null;
     custom.push([str(menu, CUSTOM_NAME_MAX), tier, px]);
   }
-  return { s: sid, n: name, l: raw.l, r: raw.r, w: raw.w, f: [...raw.f], i: items, p: pets, c: custom };
+  return { s: sid, n: name, l: raw.l, r: raw.r, k: cols, d: door, w: raw.w, f: [...raw.f], i: items, p: pets, c: custom };
 }
 
 // ───── 다녀온 가게 목록, 방문 선물 ─────
@@ -193,7 +198,7 @@ function shopFrom(snap) {
   const home = G.state;
   return {
     v: 1, started: true, shopName: snap.n,
-    coins: 0, xp: LEVEL_XP[snap.l - 1], rows: snap.r,
+    coins: 0, xp: LEVEL_XP[snap.l - 1], rows: snap.r, cols: snap.k, door: snap.d,
     items: snap.i.map(([type, x, y, lv], i) => ({ id: i + 1, type, x, y, ...(type === 'stove' ? { lv, cook: null } : {}) })),
     nextId: snap.i.length + 1,
     floor: [...snap.f], wall: snap.w, walls: [snap.w],

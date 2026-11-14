@@ -1,14 +1,15 @@
 // 게임 상태와 규칙. 화면(DOM, canvas)은 모른다. 바뀐 일은 on()으로 알린다.
 import {
   RECIPES, RECIPE, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FURN_GROUPS, FLOORS, WALLS,
-  PETS, PET_SLOTS, PET_NAME_MAX, WEAR, START_ROWS, EXPANSIONS,
+  PETS, PET_SLOTS, PET_NAME_MAX, WEAR, START_ROWS, START_COLS, START_DOOR, EXPANSIONS, WIDENINGS, EXPAND_DIRS,
   STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, levelOf, stoveLimit,
 } from './data.js';
 import { CUSTOMER_LOOKS, validIcon } from './sprites.js';
 import { mirror } from './device.js';
 
-export const COLS = 8;
-export const DOOR_X = 6; // 문 아래 칸 (DOOR_X, 0)은 손님이 드나드는 길
+// 가게 크기는 저장에 있다: state.rows(세로 줄 수), state.cols(가로 칸 수). 칸 번호는 y * cols + x.
+// 문은 윗벽의 state.door 칸 위에 있고, 그 아래 칸 (door, 0)은 손님이 드나드는 길이다.
+const cols = () => G.state.cols;
 const SAVE_KEY = 'schnauzer-cafe-v1';
 const PATIENCE = 40; // 손님이 기다려 주는 시간(초)
 const EAT_TIME = 5;
@@ -32,14 +33,14 @@ function freshState() {
   const it = (type, x, y, extra) => ({ id: id++, type, x, y, ...extra });
   return {
     v: 1, started: false, shopName: '',
-    coins: 100, xp: 0, rows: START_ROWS,
+    coins: 100, xp: 0, rows: START_ROWS, cols: START_COLS, door: START_DOOR,
     items: [
       it('stove', 1, 0, { lv: 1, cook: null }), it('plant', 0, 0),
       it('table', 2, 2), it('stool', 1, 2), it('stool', 3, 2),
       it('table', 5, 4), it('stool', 4, 4), it('stool', 6, 4),
     ],
     nextId: id,
-    floor: Array(START_ROWS * COLS).fill('wood'),
+    floor: Array(START_ROWS * START_COLS).fill('wood'),
     wall: 'cream', walls: ['cream'],
     inv: {}, stock: {},
     pets: [], nextPet: 1, closet: [],
@@ -68,6 +69,8 @@ function upgrade(s) {
   s.music ??= true;
   s.dim ??= true;
   s.photo ??= null;
+  s.cols ??= START_COLS;
+  s.door ??= START_DOOR;
   delete s.lastSeen; // 자리를 비운 동안 팔던 때 쓰던 값
   return s;
 }
@@ -157,6 +160,7 @@ export function leaveVisit() {
 
 const BACKUP_PREFIX = 'CAFE1:';
 export const MAX_ROWS = START_ROWS + Object.keys(EXPANSIONS).length;
+export const MAX_COLS = START_COLS + Object.keys(WIDENINGS).length;
 
 // 붙여 넣은 백업이 이 게임이 읽을 수 있는 모양인지 본다. 잘린 코드나 엉뚱한 글을 걸러 낸다.
 function usable(s) {
@@ -168,7 +172,8 @@ function usable(s) {
     && int(s.coins) && s.coins >= 0 && int(s.xp) && s.xp >= 0
     && int(s.nextId) && int(s.nextPet) && int(s.nextCustom)
     && int(s.rows) && s.rows >= START_ROWS && s.rows <= MAX_ROWS
-    && Array.isArray(s.floor) && s.floor.length === s.rows * COLS && s.floor.every(f => has(FLOORS, f))
+    && int(s.cols) && s.cols >= START_COLS && s.cols <= MAX_COLS && int(s.door) && s.door >= 0 && s.door < s.cols
+    && Array.isArray(s.floor) && s.floor.length === s.rows * s.cols && s.floor.every(f => has(FLOORS, f))
     && has(WALLS, s.wall) && Array.isArray(s.walls) && Array.isArray(s.notes)
     && (s.photo === null || validPhoto(s.photo))
     && obj(s.inv) && obj(s.stock) && obj(s.stats)
@@ -179,7 +184,7 @@ function usable(s) {
       && int(p.id) && has(PETS, p.species) && typeof p.name === 'string' && int(p.love) && obj(p.wear)
       && Object.entries(p.wear).every(([slot, id]) => has(WEAR, id) && WEAR[id].slot === slot))
     && Array.isArray(s.items) && s.items.every(i => obj(i) && has(FURN, i.type)
-      && int(i.x) && int(i.y) && i.x >= 0 && i.x < COLS && i.y >= 0 && i.y < s.rows
+      && int(i.x) && int(i.y) && i.x >= 0 && i.x < s.cols && i.y >= 0 && i.y < s.rows
       && (i.type !== 'stove' || (STOVE_SPEED[i.lv - 1] > 0 && (!i.cook || recipe(i.cook.r)))));
 }
 
@@ -216,7 +221,7 @@ export const petById = id => G.state.pets.find(p => p.id === id);
 export const charm = () => G.state.items.reduce((sum, i) => sum + (FURN[i.type].charm || 0), 0);
 export const stoves = () => G.state.items.filter(i => i.type === 'stove');
 export const cookState = st => (!st.cook ? 'idle' : Date.now() >= st.cook.end ? 'done' : 'cooking');
-const inBounds = (x, y) => x >= 0 && y >= 0 && x < COLS && y < G.state.rows;
+const inBounds = (x, y) => x >= 0 && y >= 0 && x < cols() && y < G.state.rows;
 const spawnInterval = () => Math.max(3.5, 9 - charm() * 0.2);
 
 // 메뉴: 기본 메뉴와 나만의 메뉴를 같은 모양으로 다룬다.
@@ -264,37 +269,38 @@ export function unlocksAt(lv) {
   for (const t of Object.values(CUSTOM_TIERS)) if (t.lv === lv && lv > 1) out.push({ text: `나만의 메뉴: ${t.name} 등급` });
   if (stoveLimit(lv) > stoveLimit(lv - 1)) out.push({ icon: 'stove', text: `화구를 ${stoveLimit(lv)}개까지 놓을 수 있어요` });
   if (PET_SLOTS.some((slot, i) => i > 0 && slot.lv === lv)) out.push({ text: '새 동물 친구를 데려올 수 있어요' });
-  if (EXPANSIONS[G.state.rows]?.lv === lv) out.push({ text: '가게를 한 줄 넓힐 수 있어요' });
+  if (EXPANSIONS[G.state.rows]?.lv === lv) out.push({ text: '가게를 위아래로 한 줄 넓힐 수 있어요' });
+  if (WIDENINGS[G.state.cols]?.lv === lv) out.push({ text: '가게를 옆으로 한 줄 넓힐 수 있어요' });
   return out;
 }
 
 // ───── 길 찾기 ─────
 
 function blockGrid() {
-  const grid = new Uint8Array(COLS * G.state.rows);
-  for (const i of G.state.items) if (FURN[i.type].block) grid[i.y * COLS + i.x] = 1;
+  const C = cols(), grid = new Uint8Array(C * G.state.rows);
+  for (const i of G.state.items) if (FURN[i.type].block) grid[i.y * C + i.x] = 1;
   return grid;
 }
 
 // 시작 칸에서 isGoal 칸까지의 길(시작 칸 제외). 막힌 칸이라도 목적지면 들어갈 수 있다. 길이 없으면 null.
 function findPath(sx, sy, isGoal, grid = blockGrid()) {
-  const rows = G.state.rows;
-  const prev = new Int16Array(COLS * rows).fill(-1);
-  const start = sy * COLS + sx;
+  const rows = G.state.rows, C = cols();
+  const prev = new Int16Array(C * rows).fill(-1);
+  const start = sy * C + sx;
   prev[start] = start;
   const queue = [start];
   for (let qi = 0; qi < queue.length; qi++) {
-    const cur = queue[qi], cx = cur % COLS, cy = (cur - cx) / COLS;
+    const cur = queue[qi], cx = cur % C, cy = (cur - cx) / C;
     if (isGoal(cx, cy)) {
       const path = [];
-      for (let n = cur; n !== start; n = prev[n]) path.unshift({ x: n % COLS, y: Math.floor(n / COLS) });
+      for (let n = cur; n !== start; n = prev[n]) path.unshift({ x: n % C, y: Math.floor(n / C) });
       return path;
     }
     if (grid[cur] && cur !== start) continue;
     for (const [dx, dy] of DIRS) {
       const nx = cx + dx, ny = cy + dy;
       if (!inBounds(nx, ny)) continue;
-      const ni = ny * COLS + nx;
+      const ni = ny * C + nx;
       if (prev[ni] !== -1 || (grid[ni] && !isGoal(nx, ny))) continue;
       prev[ni] = cur;
       queue.push(ni);
@@ -304,12 +310,12 @@ function findPath(sx, sy, isGoal, grid = blockGrid()) {
 }
 
 function nearestFree(x, y) {
-  const grid = blockGrid();
+  const grid = blockGrid(), C = cols();
   let best = null, bestD = Infinity;
   for (let ty = 0; ty < G.state.rows; ty++) {
-    for (let tx = 0; tx < COLS; tx++) {
+    for (let tx = 0; tx < C; tx++) {
       const d = Math.abs(tx - x) + Math.abs(ty - y);
-      if (!grid[ty * COLS + tx] && d < bestD) { best = { x: tx, y: ty }; bestD = d; }
+      if (!grid[ty * C + tx] && d < bestD) { best = { x: tx, y: ty }; bestD = d; }
     }
   }
   return best || { x, y };
@@ -365,17 +371,17 @@ function pickOrder() {
 }
 
 function trySpawn() {
-  const w = G.world;
+  const w = G.world, door = G.state.door;
   const taken = new Set(w.customers.map(c => c.seat.id));
   const free = seats().filter(s => !taken.has(s.id));
   const grid = blockGrid();
   while (free.length) {
     const seat = free.splice(rand(free.length), 1)[0];
-    const path = findPath(DOOR_X, 0, (x, y) => x === seat.x && y === seat.y, grid);
+    const path = findPath(door, 0, (x, y) => x === seat.x && y === seat.y, grid);
     if (!path) continue;
     w.customers.push({
       id: w.nextCid++, look: rand(CUSTOMER_LOOKS), seat, order: pickOrder(),
-      x: DOOR_X, y: -1, path: [{ x: DOOR_X, y: 0 }, ...path],
+      x: door, y: -1, path: [{ x: door, y: 0 }, ...path],
       state: 'in', t: 0, dir: 1, up: false, walk: 0, claim: null,
     });
     return;
@@ -383,9 +389,10 @@ function trySpawn() {
 }
 
 function leave(c) {
-  const path = findPath(c.seat.x, c.seat.y, (x, y) => x === DOOR_X && y === 0);
+  const door = G.state.door;
+  const path = findPath(c.seat.x, c.seat.y, (x, y) => x === door && y === 0);
   if (!path) { c.state = 'gone'; return; }
-  c.path = [...path, { x: DOOR_X, y: -1 }];
+  c.path = [...path, { x: door, y: -1 }];
   c.state = 'out';
 }
 
@@ -468,7 +475,7 @@ function updatePet(p, dt) {
     const grid = blockGrid();
     for (const c of w.customers) {
       if (c.state !== 'wait' || c.t < 1.2 || c.claim != null || !(s.stock[c.order] > 0)) continue;
-      const near = (x, y) => !grid[y * COLS + x] && Math.abs(x - c.seat.x) + Math.abs(y - c.seat.y) === 1;
+      const near = (x, y) => !grid[y * cols() + x] && Math.abs(x - c.seat.x) + Math.abs(y - c.seat.y) === 1;
       const path = findPath(Math.round(p.x), Math.round(p.y), near, grid);
       if (path) {
         c.claim = p.id;
@@ -492,7 +499,7 @@ function updatePet(p, dt) {
   const beds = s.items.filter(i => i.type === 'dogbed');
   const goal = beds.length && Math.random() < 0.35
     ? beds[rand(beds.length)]
-    : { x: rand(COLS), y: rand(s.rows) };
+    : { x: rand(cols()), y: rand(s.rows) };
   const path = findPath(Math.round(p.x), Math.round(p.y), (x, y) => x === goal.x && y === goal.y);
   if (path && path.length && !FURN[itemAt(goal.x, goal.y)?.type]?.block) { p.state = 'walk'; p.path = path; }
   else { p.state = 'idle'; p.t = 1; }
@@ -645,7 +652,7 @@ export function exitEdit() {
 function placeError(type, x, y) {
   if (!inBounds(x, y)) return '가게 밖에는 놓을 수 없어요';
   if (itemAt(x, y)) return '이미 가구가 있는 칸이에요';
-  if (FURN[type].block && x === DOOR_X && y === 0) return '문 앞은 비워 둬야 해요';
+  if (FURN[type].block && x === G.state.door && y === 0) return '문 앞은 비워 둬야 해요';
   return null;
 }
 
@@ -697,7 +704,7 @@ function upgradeStove(id) {
 }
 
 function paintFloor(x, y, id) {
-  const s = G.state, f = FLOORS[id], i = y * COLS + x;
+  const s = G.state, f = FLOORS[id], i = y * cols() + x;
   if (!inBounds(x, y) || s.floor[i] === id) return false;
   if (s.coins < f.price) return fail('코인이 모자라요');
   s.coins -= f.price;
@@ -727,18 +734,38 @@ export function setPhoto(photo) {
   return true;
 }
 
-function expandError() {
-  const cfg = EXPANSIONS[G.state.rows];
-  if (!cfg) return '더 넓힐 수 없어요';
+// 넓히기. 위·아래는 줄 수(EXPANSIONS), 왼쪽·오른쪽은 칸 수(WIDENINGS)가 늘어난다.
+// 위나 왼쪽으로 넓히면 새 칸이 앞에 끼어들므로, 있던 가구와 문을 한 칸씩 밀어 제자리를 지킨다.
+const tall = dir => dir === 'up' || dir === 'down';
+export const expandCfg = dir => (tall(dir) ? EXPANSIONS[G.state.rows] : WIDENINGS[G.state.cols]) || null;
+function expandError(dir) {
+  const cfg = expandCfg(dir);
+  if (!cfg) return tall(dir) ? '위아래로는 더 넓힐 수 없어요' : '옆으로는 더 넓힐 수 없어요';
   if (level() < cfg.lv) return `레벨 ${cfg.lv}부터 넓힐 수 있어요`;
   return G.state.coins < cfg.price ? '코인이 모자라요' : null;
 }
-function expand() {
-  const s = G.state, err = expandError();
+function expand(dir) {
+  const s = G.state, err = expandError(dir);
   if (err) return fail(err);
-  s.coins -= EXPANSIONS[s.rows].price;
-  s.rows++;
-  s.floor.push(...Array(COLS).fill('wood'));
+  s.coins -= expandCfg(dir).price;
+  const C = s.cols, dx = dir === 'left' ? 1 : 0, dy = dir === 'up' ? 1 : 0;
+  if (tall(dir)) {
+    const row = Array(C).fill('wood');
+    s.floor = dy ? [...row, ...s.floor] : [...s.floor, ...row];
+    s.rows++;
+  } else {
+    const floor = [];
+    for (let y = 0; y < s.rows; y++) {
+      const row = s.floor.slice(y * C, (y + 1) * C);
+      floor.push(...(dx ? ['wood', ...row] : [...row, 'wood']));
+    }
+    s.floor = floor;
+    s.cols++;
+    s.door += dx;
+  }
+  for (const it of s.items) { it.x += dx; it.y += dy; }
+  for (const p of G.world.pets) Object.assign(p, { x: Math.round(p.x) + dx, y: Math.round(p.y) + dy, path: [], state: 'idle', target: null });
+  G.edit.dirty = true; // 나갈 때 손님을 내보내고 길을 다시 잡는다
   emit('place');
   emit('resize');
   return true;
@@ -761,7 +788,7 @@ export function askPlace(type, x, y) {
 
 // 칠할 칸을 하나씩 모은다. 모은 칸 값이 가진 코인을 넘으면 더 모으지 않는다.
 export function askPaint(x, y, id) {
-  const s = G.state, e = G.edit, f = FLOORS[id], i = y * COLS + x;
+  const s = G.state, e = G.edit, f = FLOORS[id], i = y * cols() + x;
   if (!inBounds(x, y) || s.floor[i] === id) return false;
   if (!f.price) return paintFloor(x, y, id);
   const p = e.pending?.kind === 'floor' && e.pending.id === id ? e.pending : { kind: 'floor', id, tiles: [] };
@@ -781,10 +808,10 @@ export function askWall(id) {
   return true;
 }
 
-export function askExpand() {
-  const err = expandError();
+export function askExpand(dir) {
+  const err = expandError(dir);
   if (err) return fail(err);
-  G.edit.pending = { kind: 'expand' };
+  G.edit.pending = { kind: 'expand', dir };
   return true;
 }
 
@@ -803,7 +830,7 @@ export function pendingInfo() {
     case 'furn': return { name: FURN[p.type].name, cost: FURN[p.type].price };
     case 'floor': return { name: `${FLOORS[p.id].name} ${p.tiles.length}칸`, cost: FLOORS[p.id].price * p.tiles.length };
     case 'wall': return { name: WALLS[p.id].name, cost: WALLS[p.id].price };
-    case 'expand': return { name: '가게 한 줄 넓히기', cost: EXPANSIONS[G.state.rows].price };
+    case 'expand': return { name: `${EXPAND_DIRS[p.dir]} 한 줄 넓히기`, cost: expandCfg(p.dir).price };
     default: return { name: `화구 ${itemById(p.id).lv + 1}단계로 강화`, cost: upgradeCost(itemById(p.id)) };
   }
 }
@@ -814,11 +841,11 @@ export function confirmPending() {
   switch (p.kind) {
     case 'furn': return place(p.type, p.x, p.y);
     case 'floor':
-      for (const i of p.tiles) paintFloor(i % COLS, Math.floor(i / COLS), p.id);
+      for (const i of p.tiles) paintFloor(i % cols(), Math.floor(i / cols()), p.id);
       emit('place');
       return true;
     case 'wall': return setWall(p.id);
-    case 'expand': return expand();
+    case 'expand': return expand(p.dir);
     default: return upgradeStove(p.id);
   }
 }
