@@ -311,6 +311,17 @@ textarea { resize: none; }
 .list li span { flex: 1; min-width: 0; word-break: break-word; -webkit-user-select: text; user-select: text; }
 .list li img { width: 32px; height: 32px; flex: none; object-fit: contain; }
 hr { border: 0; border-top: var(--edge); margin: 12px 0; }
+.license {
+  margin: 0;
+  padding: 8px;
+  font: 12px/1.5 ui-monospace, monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #fff;
+  border: var(--edge);
+  -webkit-user-select: text;
+  user-select: text;
+}
 
 #toast {
   position: absolute;

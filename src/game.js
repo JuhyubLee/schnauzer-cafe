@@ -5,6 +5,7 @@ import {
   STOVE_SPEED, STOVE_UPGRADE_COST, levelOf, stoveLimit,
 } from './data.js';
 import { CUSTOMER_LOOKS, validIcon } from './sprites.js';
+import { mirror } from './device.js';
 
 export const COLS = 8;
 export const DOOR_X = 6; // 문 아래 칸 (DOOR_X, 0)은 손님이 드나드는 길
@@ -97,6 +98,7 @@ export function save() {
   G.state.lastSeen = Date.now();
   const json = JSON.stringify(G.state);
   try { localStorage.setItem(SAVE_KEY, json); } catch { /* 저장 공간이 막힌 브라우저 */ }
+  mirror(SAVE_KEY, json);
   return json;
 }
 
@@ -111,6 +113,7 @@ export function load() {
 
 export function reset() {
   try { localStorage.removeItem(SAVE_KEY); } catch { /* 위와 같음 */ }
+  mirror(SAVE_KEY, null);
   load();
 }
 

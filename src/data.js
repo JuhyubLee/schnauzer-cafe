@@ -58,6 +58,12 @@ export const PET_NAME_MAX = 6;
 export const VISIT_GIFT = 30;
 export const GIFTS_PER_DAY = 3;
 
+// 앱 정보. 버전은 스토어에 올릴 때마다 올린다(android/app/build.gradle, ios 프로젝트와 같이).
+export const APP_VERSION = '1.0.0';
+// 웹 버전이 있는 주소. 초대장 링크와 개인정보 처리방침이 여기에 있다. 바꾸면 이미 보낸 초대장이 안 열린다.
+export const SITE_URL = 'https://juhyublee.github.io/schnauzer-cafe/';
+export const PRIVACY_URL = `${SITE_URL}privacy.html`;
+
 // 옷. slot마다 하나씩 입는다. 그림은 sprites.js의 wear_<id>.
 export const WEAR_SLOTS = { hat: '모자', neck: '목', body: '옷' };
 export const WEAR = {

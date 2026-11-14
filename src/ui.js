@@ -5,8 +5,11 @@ import {
   startCook, collect, costOf, petPet, enterEdit, exitEdit, storeItem, upgradeStove, upgradeCost,
   setWall, expand, save, reset, startGame, exportSave, importSave,
 } from './game.js';
-import { FURN, FLOORS, WALLS, EXPANSIONS, LEVEL_XP, PETS, MAX_CUSTOM, stoveLimit, fmtTime } from './data.js';
+import {
+  FURN, FLOORS, WALLS, EXPANSIONS, LEVEL_XP, PETS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL, stoveLimit, fmtTime,
+} from './data.js';
 import { $, esc, setText, setHTML, setSrc, copyText } from './dom.js';
+import { share } from './device.js';
 import { sfx } from './sfx.js';
 import { syncMusic } from './music.js';
 import { createPetUI } from './ui-pet.js';
@@ -126,7 +129,7 @@ export function initUI({ atlas, renderer }) {
       ? s.notes.map((n, i) => `<li><span>${esc(n.text)}</span><small class="muted">${esc(n.date)}</small>
           <button type="button" class="btn" data-act="del" data-i="${i}">지우기</button></li>`).join('')
       : '<li><span class="muted">아직 적어 둔 의견이 없어요</span></li>';
-    openSheet('의견', `<p class="muted">이런 게 있으면 좋겠다 싶은 걸 적어 두세요. 다음 버전에 넣을게요.</p>
+    openSheet('의견', `<p class="muted">이런 게 있으면 좋겠다 싶은 걸 적어 두세요. 모아서 보내기로 만든 사람에게 전할 수 있어요.</p>
       <textarea id="noteText" rows="3" maxlength="200" placeholder="예) 마라탕도 팔고 싶어, 가구가 더 많았으면 좋겠어"></textarea>
       <div class="pair">
         <button type="button" class="btn primary" data-act="add">적어 두기</button>
@@ -152,10 +155,7 @@ export function initUI({ atlas, renderer }) {
         async share() {
           if (!s.notes.length) { toast('먼저 의견을 적어 주세요'); return; }
           const text = `[${s.shopName} 의견]\n` + s.notes.map(n => `- ${n.text}`).join('\n');
-          if (navigator.share) {
-            try { await navigator.share({ text }); } catch { /* 공유 창을 닫은 경우 */ }
-            return;
-          }
+          if (await share({ text })) return;
           toast(await copyText(text) ? '복사했어요. 카톡에 붙여 넣어 보내세요' : '복사가 안 돼요. 목록을 길게 눌러 복사해 주세요');
         },
       },
@@ -183,6 +183,12 @@ export function initUI({ atlas, renderer }) {
         <button type="button" class="btn" data-act="restore">이 코드로 되살리기</button>
         <hr>
         <button type="button" class="btn danger" data-act="reset">처음부터 다시 하기</button>
+        <hr>
+        <div class="pair">
+          <button type="button" class="btn" data-act="privacy">개인정보 처리방침</button>
+          <button type="button" class="btn" data-act="licenses">글꼴 라이선스</button>
+        </div>
+        <p class="muted center">버전 ${APP_VERSION}</p>
       </div>`, {
       actions: {
         name() {
@@ -221,8 +227,23 @@ export function initUI({ atlas, renderer }) {
           reset();
           location.reload();
         },
+        privacy() { window.open(PRIVACY_URL, '_blank', 'noopener'); },
+        async licenses() {
+          let text = '';
+          try { text = (await (await fetch('assets/Galmuri-OFL.md')).text()).replace(/&copy;/g, '©'); } catch { /* 아래 안내로 대신한다 */ }
+          openSheet('글꼴 라이선스', `<p>이 게임은 Galmuri 글꼴을 씁니다. SIL Open Font License 1.1에 따라 쓸 수 있는 글꼴이에요.</p>
+            <pre class="license">${esc(text || '라이선스 글을 불러오지 못했어요. https://openfontlicense.org 에서 볼 수 있어요.')}</pre>`);
+        },
       },
     });
+  }
+
+  // 안드로이드 뒤로 가기 버튼: 열린 것부터 하나씩 닫는다. 닫을 게 없으면 false.
+  function back() {
+    if (sheetOpen()) { closeSheet(); return true; }
+    if (G.edit) { closeEdit(); return true; }
+    if (G.visit) { $('visitLeave').click(); return true; }
+    return false;
   }
 
   // ── 레벨 업, 다녀왔을 때 ──
@@ -426,5 +447,5 @@ export function initUI({ atlas, renderer }) {
   on('custom', id => { delete icons[`custom_${id}`]; });
 
   refresh();
-  return { refresh, renderEdit, openCook, showWelcome, toast, handleInvite: visitUI.handleInvite };
+  return { refresh, renderEdit, openCook, showWelcome, toast, back, handleInvite: visitUI.handleInvite };
 }

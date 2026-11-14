@@ -4,9 +4,10 @@
 import { G, level, enterVisit, leaveVisit, save, COLS, DOOR_X, MAX_ROWS } from './game.js';
 import {
   RECIPES, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FLOORS, WALLS, PETS, PET_SLOTS, PET_NAME_MAX,
-  WEAR, START_ROWS, LEVEL_XP, VISIT_GIFT, GIFTS_PER_DAY, STOVE_SPEED,
+  WEAR, START_ROWS, LEVEL_XP, VISIT_GIFT, GIFTS_PER_DAY, STOVE_SPEED, SITE_URL,
 } from './data.js';
 import { validIcon } from './sprites.js';
+import { mirror } from './device.js';
 
 const FRIENDS_KEY = 'schnauzer-cafe-friends'; // 내 가게 저장과 따로 둔다(백업 코드에도 안 들어간다)
 const MAX_FRIENDS = 12;
@@ -67,7 +68,8 @@ export async function encode(snap) {
   return 'V1.' + toB64(await through(bytes, new CompressionStream('deflate-raw')));
 }
 
-export const inviteLink = code => `${location.origin}${location.pathname}#visit=${code}`;
+// 앱 안에서는 주소가 달라서, 초대장은 항상 웹 주소로 만든다.
+export const inviteLink = code => `${SITE_URL}#visit=${code}`;
 
 // 붙여 넣은 글이나 주소에서 초대장 부분만 찾는다.
 export const codeFromText = text => (String(text).match(/V[01]\.[A-Za-z0-9_-]+/) || [null])[0];
@@ -155,7 +157,9 @@ export function friends() {
   return cache;
 }
 function store() {
-  try { localStorage.setItem(FRIENDS_KEY, JSON.stringify(cache)); } catch { /* 저장 공간이 막힌 브라우저 */ }
+  const json = JSON.stringify(cache);
+  try { localStorage.setItem(FRIENDS_KEY, json); } catch { /* 저장 공간이 막힌 브라우저 */ }
+  mirror(FRIENDS_KEY, json);
 }
 
 // 받은 초대장을 목록 맨 위에 적어 둔다. 같은 가게면 새 모습으로 바꾼다. 내 가게 초대장은 적지 않는다.

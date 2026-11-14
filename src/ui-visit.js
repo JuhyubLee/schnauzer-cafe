@@ -6,6 +6,7 @@ import {
 } from './visit.js';
 import { VISIT_GIFT, GIFTS_PER_DAY } from './data.js';
 import { $, esc, copyText } from './dom.js';
+import { share } from './device.js';
 import { sfx } from './sfx.js';
 
 const UNREADABLE = '초대장을 읽지 못했어요. 주소를 처음부터 끝까지 복사했는지 봐 주세요';
@@ -68,10 +69,7 @@ export function createVisitUI({ toast, openSheet, closeSheet, refresh, coin }) {
         async invite() {
           const url = inviteLink(await encode(makeSnapshot()));
           const text = `${G.state.shopName}에 놀러 오세요!`;
-          if (navigator.share) {
-            try { await navigator.share({ text, url }); } catch { /* 공유 창을 닫은 경우 */ }
-            return;
-          }
+          if (await share({ text, url })) return;
           if (await copyText(`${text}\n${url}`)) { toast('초대장을 복사했어요. 카톡에 붙여 넣어 보내세요'); return; }
           $('inviteText').value = url;
           toast('복사가 안 돼요. 아래 칸의 주소를 길게 눌러 복사해 주세요');

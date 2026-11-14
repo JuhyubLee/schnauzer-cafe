@@ -9,7 +9,10 @@ import { createRenderer, VIEW_W, viewH, tileAt, TILE, PAD, WALL_H } from './rend
 import { initUI } from './ui.js';
 import { sfx } from './sfx.js';
 import { syncMusic } from './music.js';
+import { restoreMirrored, onBack } from './device.js';
 
+// 앱에서는 웹 저장소가 지워졌을 때 기기 저장소의 사본으로 되살린 다음 불러온다.
+await restoreMirrored('schnauzer-cafe-');
 load();
 const canvas = document.getElementById('cv');
 const stage = document.getElementById('stage');
@@ -139,6 +142,9 @@ comeBack();
 // ── 초대장 링크(주소 뒤 #visit=...)로 들어왔을 때 ──
 ui.handleInvite(location.hash);
 window.addEventListener('hashchange', () => ui.handleInvite(location.hash));
+
+// ── 안드로이드 뒤로 가기 ──
+onBack(ui.back);
 
 // ── 매 프레임 ──
 // 바뀐 게 있으면 그 프레임에 바로 저장한다. 브라우저를 그냥 꺼도 마지막 조작이 남게.
