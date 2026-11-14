@@ -212,7 +212,9 @@ export function createRenderer(canvas, atlas) {
 
   function drawRoom(s, time) {
     const h = canvas.height;
-    g.drawImage(walls[s.wall], 0, 0);
+    // 꾸미기에서 구매 확정을 기다리는 벽지와 바닥은 산 것처럼 미리 보여 준다.
+    const pending = G.edit?.pending;
+    g.drawImage(walls[pending?.kind === 'wall' ? pending.id : s.wall], 0, 0);
     g.fillStyle = '#6b4329'; g.fillRect(0, WALL_H - 5, VIEW_W, 5);
     g.fillStyle = '#9a6842'; g.fillRect(0, WALL_H - 5, VIEW_W, 1);
 
@@ -241,8 +243,12 @@ export function createRenderer(canvas, atlas) {
     spr('door', doorX, doorY);
     g.fillStyle = skyCSS(sky); g.fillRect(doorX + 4, doorY + 4, 8, 4); // 문 유리에도 바깥 하늘이 비친다
     g.fillStyle = 'rgba(255,255,255,0.5)'; g.fillRect(doorX + 6, doorY + 5, 1, 1); g.fillRect(doorX + 5, doorY + 6, 1, 1);
+    const trying = pending?.kind === 'floor' ? pending : null;
     for (let y = 0; y < s.rows; y++) {
-      for (let x = 0; x < COLS; x++) g.drawImage(floors[s.floor[y * COLS + x]], PAD + x * TILE, WALL_H + y * TILE);
+      for (let x = 0; x < COLS; x++) {
+        const i = y * COLS + x;
+        g.drawImage(floors[trying?.tiles.includes(i) ? trying.id : s.floor[i]], PAD + x * TILE, WALL_H + y * TILE);
+      }
     }
     // 문 앞 발매트
     g.fillStyle = '#cf6410'; g.fillRect(PAD + DOOR_X * TILE + 2, WALL_H, 12, 3);
@@ -353,19 +359,34 @@ export function createRenderer(canvas, atlas) {
     }
   }
 
+  // 칸 둘레에 주황 테두리를 그린다(고른 가구, 사려는 가구 자리).
+  function tileMark(tx, ty) {
+    const x = PAD + tx * TILE, y = WALL_H + ty * TILE;
+    g.fillStyle = '#fff7ea';
+    g.fillRect(x - 1, y - 1, 18, 2); g.fillRect(x - 1, y + 15, 18, 2);
+    g.fillRect(x - 1, y - 1, 2, 18); g.fillRect(x + 15, y - 1, 2, 18);
+    g.fillStyle = '#f58a1f';
+    g.fillRect(x, y, 16, 1); g.fillRect(x, y + 15, 16, 1);
+    g.fillRect(x, y, 1, 16); g.fillRect(x + 15, y, 1, 16);
+  }
+
   function drawEdit(s, e, time) {
     g.fillStyle = 'rgba(59,43,43,0.28)';
     for (let x = 0; x <= COLS; x++) g.fillRect(PAD + x * TILE - (x === COLS ? 1 : 0), WALL_H, 1, s.rows * TILE);
     for (let y = 0; y <= s.rows; y++) g.fillRect(PAD, WALL_H + y * TILE - (y === s.rows ? 1 : 0), COLS * TILE, 1);
+    const blink = Math.floor(time * 3) % 2 === 0;
     const sel = s.items.find(i => i.id === e.sel);
-    if (sel && Math.floor(time * 3) % 2 === 0) {
-      const x = PAD + sel.x * TILE, y = WALL_H + sel.y * TILE;
-      g.fillStyle = '#fff7ea';
-      g.fillRect(x - 1, y - 1, 18, 2); g.fillRect(x - 1, y + 15, 18, 2);
-      g.fillRect(x - 1, y - 1, 2, 18); g.fillRect(x + 15, y - 1, 2, 18);
-      g.fillStyle = '#f58a1f';
-      g.fillRect(x, y, 16, 1); g.fillRect(x, y + 15, 16, 1);
-      g.fillRect(x, y, 1, 16); g.fillRect(x + 15, y, 1, 16);
+    if (sel && blink) tileMark(sel.x, sel.y);
+    // 구매 확정을 기다리는 것: 가구는 놓일 자리에 흐리게, 바닥은 칠할 칸을 깜빡여서 보여 준다.
+    const p = e.pending;
+    if (p?.kind === 'furn') {
+      tileMark(p.x, p.y);
+      g.globalAlpha = blink ? 0.9 : 0.6;
+      sprOnTile(FURN[p.type].sprite, p.x, p.y);
+      g.globalAlpha = 1;
+    } else if (p?.kind === 'floor' && blink) {
+      g.fillStyle = 'rgba(255,255,255,0.35)';
+      for (const i of p.tiles) g.fillRect(PAD + (i % COLS) * TILE, WALL_H + Math.floor(i / COLS) * TILE, TILE, TILE);
     }
   }
 

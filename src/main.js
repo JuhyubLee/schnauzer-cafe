@@ -1,7 +1,7 @@
 // 시작점: 불러오기, 화면 크기 맞추기, 터치 처리, 매 프레임 갱신.
 import {
   G, load, save, tick, on, serve, petPet, collect, cookState, stoves, recipeOf,
-  place, moveItem, paintFloor,
+  askPlace, moveItem, askPaint,
 } from './game.js';
 import { fmtTime } from './data.js';
 import { buildAtlas, setSprite } from './sprites.js';
@@ -90,8 +90,9 @@ function playTap(p) {
 
 function editTap(p) {
   const e = G.edit, t = tileAt(p.x, p.y);
-  if (e.place) place(e.place, t.x, t.y);
+  if (e.place) askPlace(e.place, t.x, t.y);
   else {
+    e.pending = null;
     const it = renderer.pickItem(p.x, p.y);
     if (it) e.sel = e.sel === it.id ? null : it.id;
     else if (e.sel != null) moveItem(e.sel, t.x, t.y);
@@ -101,7 +102,7 @@ function editTap(p) {
 
 function paintAt(e) {
   const p = toView(e), t = tileAt(p.x, p.y);
-  if (paintFloor(t.x, t.y, G.edit.floor)) sfx('tap');
+  if (askPaint(t.x, t.y, G.edit.floor)) { sfx('tap'); ui.renderEdit(); }
 }
 
 let press = null;

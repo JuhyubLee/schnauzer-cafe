@@ -26,21 +26,24 @@ export const CUSTOM_TIERS = {
 export const MAX_CUSTOM = 6;
 export const CUSTOM_NAME_MAX = 10;
 
-// block: 지나갈 수 없음, charm: 분위기 점수(손님이 더 자주 오고 팁을 준다)
+// 꾸미기 목록에서 가구를 나눠 보여 주는 분류
+export const FURN_GROUPS = { seat: '테이블·의자', kitchen: '주방', deco: '장식', mat: '깔개' };
+
+// group: 위의 분류, block: 지나갈 수 없음, charm: 분위기 점수(손님이 더 자주 오고 팁을 준다)
 // table: 옆에 스툴을 붙이면 손님 자리가 되는 가구, light: 밤에 둘레를 밝히는 가구
 export const FURN = {
-  stool: { name: '주황 스툴', sprite: 'stool', price: 25, lv: 1, block: true },
-  table: { name: '원목 테이블', sprite: 'table', price: 60, lv: 1, block: true, table: true },
-  table_white: { name: '하얀 테이블', sprite: 'table_white', price: 90, lv: 2, block: true, table: true, charm: 1 },
-  table_orange: { name: '주황 테이블', sprite: 'table_orange', price: 110, lv: 3, block: true, table: true, charm: 1 },
-  table_check: { name: '체크 식탁보 테이블', sprite: 'table_check', price: 160, lv: 5, block: true, table: true, charm: 2 },
-  stove: { name: '화구', sprite: 'stove', price: 250, lv: 1, block: true },
-  plant: { name: '초록 화분', sprite: 'plant', price: 40, lv: 1, block: true, charm: 2 },
-  rug: { name: '주황 러그', sprite: 'rug', price: 30, lv: 2, block: false, charm: 1 },
-  dogbed: { name: '폭신 방석', sprite: 'dogbed', price: 90, lv: 2, block: false, charm: 2 },
-  flower: { name: '주황 꽃 화분', sprite: 'flower', price: 70, lv: 3, block: true, charm: 3 },
-  lamp: { name: '스탠드 조명', sprite: 'lamp', price: 120, lv: 4, block: true, charm: 4, light: true },
-  shelf: { name: '책장', sprite: 'shelf', price: 180, lv: 5, block: true, charm: 5 },
+  stool: { name: '주황 스툴', sprite: 'stool', group: 'seat', price: 25, lv: 1, block: true },
+  table: { name: '원목 테이블', sprite: 'table', group: 'seat', price: 60, lv: 1, block: true, table: true },
+  table_white: { name: '하얀 테이블', sprite: 'table_white', group: 'seat', price: 90, lv: 2, block: true, table: true, charm: 1 },
+  table_orange: { name: '주황 테이블', sprite: 'table_orange', group: 'seat', price: 110, lv: 3, block: true, table: true, charm: 1 },
+  table_check: { name: '체크 식탁보 테이블', sprite: 'table_check', group: 'seat', price: 160, lv: 5, block: true, table: true, charm: 2 },
+  stove: { name: '화구', sprite: 'stove', group: 'kitchen', price: 250, lv: 1, block: true },
+  plant: { name: '초록 화분', sprite: 'plant', group: 'deco', price: 40, lv: 1, block: true, charm: 2 },
+  flower: { name: '주황 꽃 화분', sprite: 'flower', group: 'deco', price: 70, lv: 3, block: true, charm: 3 },
+  lamp: { name: '스탠드 조명', sprite: 'lamp', group: 'deco', price: 120, lv: 4, block: true, charm: 4, light: true },
+  shelf: { name: '책장', sprite: 'shelf', group: 'deco', price: 180, lv: 5, block: true, charm: 5 },
+  rug: { name: '주황 러그', sprite: 'rug', group: 'mat', price: 30, lv: 2, block: false, charm: 1 },
+  dogbed: { name: '폭신 방석', sprite: 'dogbed', group: 'mat', price: 90, lv: 2, block: false, charm: 2 },
 };
 
 // 동물 친구. id는 sprites.js의 PET_PAL과 같아야 한다.

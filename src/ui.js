@@ -2,11 +2,11 @@
 // 친구(옷장)와 나만의 메뉴 화면은 ui-pet.js, ui-menu.js에 있다.
 import {
   G, on, level, hint, charm, seatCount, stoves, cookState, itemById, recipeOf, allRecipes,
-  startCook, collect, costOf, enterEdit, exitEdit, storeItem, upgradeStove, upgradeCost,
-  setWall, expand, save, reset, startGame, exportSave, importSave,
+  startCook, collect, costOf, enterEdit, exitEdit, storeItem, upgradeCost,
+  askWall, askExpand, askUpgrade, pendingInfo, confirmPending, save, reset, startGame, exportSave, importSave,
 } from './game.js';
 import {
-  FURN, FLOORS, WALLS, EXPANSIONS, LEVEL_XP, PETS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL, stoveLimit, fmtTime,
+  FURN, FURN_GROUPS, FLOORS, WALLS, EXPANSIONS, LEVEL_XP, PETS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL, stoveLimit, fmtTime,
 } from './data.js';
 import { $, esc, setText, setHTML, setSrc, copyText } from './dom.js';
 import { share } from './device.js';
@@ -279,7 +279,7 @@ export function initUI({ atlas, renderer }) {
   function editCards() {
     const s = G.state, e = G.edit, lv = level();
     if (e.tab === 'furn') {
-      return Object.entries(FURN).map(([id, f]) => {
+      return Object.entries(FURN).filter(([, f]) => f.group === e.group).map(([id, f]) => {
         const locked = f.lv > lv, have = s.inv[id] || 0;
         const full = id === 'stove' && stoves().length >= stoveLimit(lv);
         const sub = locked ? `Lv ${f.lv}` : have ? `보관 ${have}개` : full ? '지금은 최대' : coin(f.price);
@@ -300,8 +300,9 @@ export function initUI({ atlas, renderer }) {
           <img class="px" src="${s.photo || icon('painting')}" alt=""><b>액자 사진</b><small>${s.photo ? '바꾸기' : '사진 걸기'}</small></button>`;
       return photoCard + Object.entries(WALLS).map(([id, w]) => {
         const locked = w.lv > lv && !s.walls.includes(id);
+        const trying = e.pending?.kind === 'wall' && e.pending.id === id; // 사기 전에 벽에 미리 대 보는 중
         const sub = s.wall === id ? '사용 중' : s.walls.includes(id) ? '바꾸기' : locked ? `Lv ${w.lv}` : coin(w.price);
-        return `<button type="button" class="card ${s.wall === id ? 'on' : ''}" data-act="wall" data-id="${id}" ${locked ? 'disabled' : ''}>
+        return `<button type="button" class="card ${trying || (s.wall === id && e.pending?.kind !== 'wall') ? 'on' : ''}" data-act="wall" data-id="${id}" ${locked ? 'disabled' : ''}>
           <img class="px" src="${renderer.wallURL(id)}" alt=""><b>${w.name}</b><small>${sub}</small></button>`;
       }).join('');
     }
@@ -309,12 +310,19 @@ export function initUI({ atlas, renderer }) {
     if (!cfg) return '<div class="card wide"><b>가게를 끝까지 넓혔어요</b></div>';
     return lv < cfg.lv
       ? `<button type="button" class="card wide" disabled><b>가게 한 줄 넓히기</b><small>레벨 ${cfg.lv}부터</small></button>`
-      : `<button type="button" class="card wide" data-act="expand"><b>가게 한 줄 넓히기</b><small>${coin(cfg.price)}</small></button>`;
+      : `<button type="button" class="card wide ${e.pending?.kind === 'expand' ? 'on' : ''}" data-act="expand"><b>가게 한 줄 넓히기</b><small>${coin(cfg.price)}</small></button>`;
   }
 
   function editInfo() {
     const e = G.edit;
     const stop = '<button type="button" class="btn" data-act="stop">그만</button>';
+    // 돈이 드는 일은 여기서 구매 확정을 눌러야 이루어진다.
+    const pending = pendingInfo();
+    if (pending) {
+      return `<span class="grow"><b>${pending.name}</b> · ${coin(pending.cost)}</span>
+        <button type="button" class="btn primary" data-act="buy">구매 확정</button>
+        <button type="button" class="btn" data-act="cancel">취소</button>`;
+    }
     if (e.sel != null) {
       const it = itemById(e.sel), f = FURN[it.type];
       const cost = it.type === 'stove' ? upgradeCost(it) : null;
@@ -333,6 +341,10 @@ export function initUI({ atlas, renderer }) {
     const e = G.edit;
     if (!e) return;
     for (const tab of document.querySelectorAll('.tabs button')) tab.setAttribute('aria-selected', tab.dataset.tab === e.tab);
+    const groups = $('editGroups');
+    groups.hidden = e.tab !== 'furn';
+    setHTML(groups, Object.entries(FURN_GROUPS).map(([id, name]) =>
+      `<button type="button" class="chip ${e.group === id ? 'on' : ''}" data-group="${id}">${name}</button>`).join(''));
     const list = $('editList'), left = list.scrollLeft;
     setHTML(list, editCards());
     list.scrollLeft = left;
@@ -342,7 +354,15 @@ export function initUI({ atlas, renderer }) {
   document.querySelector('.tabs').addEventListener('click', ev => {
     const tab = ev.target.closest('[data-tab]');
     if (!tab) return;
-    Object.assign(G.edit, { tab: tab.dataset.tab, place: null, floor: null, sel: null });
+    Object.assign(G.edit, { tab: tab.dataset.tab, place: null, floor: null, sel: null, pending: null });
+    $('editList').scrollLeft = 0;
+    sfx('tap');
+    renderEdit();
+  });
+  $('editGroups').addEventListener('click', ev => {
+    const chip = ev.target.closest('[data-group]');
+    if (!chip) return;
+    Object.assign(G.edit, { group: chip.dataset.group, place: null, pending: null });
     $('editList').scrollLeft = 0;
     sfx('tap');
     renderEdit();
@@ -351,11 +371,11 @@ export function initUI({ atlas, renderer }) {
     const el = ev.target.closest('[data-act]');
     if (!el || el.disabled) return;
     const e = G.edit, id = el.dataset.id;
-    if (el.dataset.act === 'furn') Object.assign(e, { place: e.place === id ? null : id, sel: null });
-    else if (el.dataset.act === 'floor') Object.assign(e, { floor: e.floor === id ? null : id, sel: null });
-    else if (el.dataset.act === 'wall') setWall(id);
-    else if (el.dataset.act === 'expand') expand();
-    else if (el.dataset.act === 'photo') photoUI.open();
+    if (el.dataset.act === 'furn') Object.assign(e, { place: e.place === id ? null : id, sel: null, pending: null });
+    else if (el.dataset.act === 'floor') Object.assign(e, { floor: e.floor === id ? null : id, sel: null, pending: null });
+    else if (el.dataset.act === 'wall') askWall(id);
+    else if (el.dataset.act === 'expand') askExpand();
+    else if (el.dataset.act === 'photo') { e.pending = null; photoUI.open(); }
     sfx('tap');
     renderEdit();
   });
@@ -363,9 +383,11 @@ export function initUI({ atlas, renderer }) {
     const el = ev.target.closest('[data-act]');
     if (!el) return;
     const e = G.edit;
-    if (el.dataset.act === 'stop') Object.assign(e, { place: null, floor: null });
+    if (el.dataset.act === 'stop') Object.assign(e, { place: null, floor: null, pending: null });
     else if (el.dataset.act === 'store') storeItem(e.sel);
-    else if (el.dataset.act === 'upgrade') upgradeStove(e.sel);
+    else if (el.dataset.act === 'upgrade') askUpgrade(e.sel);
+    else if (el.dataset.act === 'buy') confirmPending();
+    else if (el.dataset.act === 'cancel') e.pending = null;
     renderEdit();
   });
   $('editDone').addEventListener('click', () => { sfx('tap'); closeEdit(); });

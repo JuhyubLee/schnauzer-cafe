@@ -1,6 +1,6 @@
 // 게임 상태와 규칙. 화면(DOM, canvas)은 모른다. 바뀐 일은 on()으로 알린다.
 import {
-  RECIPES, RECIPE, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FLOORS, WALLS,
+  RECIPES, RECIPE, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FURN_GROUPS, FLOORS, WALLS,
   PETS, PET_SLOTS, PET_NAME_MAX, WEAR, START_ROWS, EXPANSIONS,
   STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, levelOf, stoveLimit,
 } from './data.js';
@@ -620,8 +620,9 @@ export function deleteCustom(id) {
 
 // ───── 꾸미기 ─────
 
+// group: 가구 목록에서 보고 있는 분류, pending: 구매 확정을 기다리는 것(아래 '구매 확정' 참고)
 export function enterEdit() {
-  G.edit = { tab: 'furn', place: null, floor: null, sel: null, dirty: false };
+  G.edit = { tab: 'furn', group: Object.keys(FURN_GROUPS)[0], place: null, floor: null, sel: null, pending: null, dirty: false };
   if (G.state.tut === 3) G.state.tut = 4;
 }
 
@@ -648,13 +649,13 @@ function placeError(type, x, y) {
   return null;
 }
 
-export function place(type, x, y) {
+const stoveLimitError = type => (type === 'stove' && stoves().length >= stoveLimit(level())
+  ? `화구는 지금 ${stoveLimit(level())}개까지 놓을 수 있어요` : null);
+
+function place(type, x, y) {
   const s = G.state, f = FURN[type];
-  const err = placeError(type, x, y);
+  const err = placeError(type, x, y) || stoveLimitError(type);
   if (err) return fail(err);
-  if (type === 'stove' && stoves().length >= stoveLimit(level())) {
-    return fail(`화구는 지금 ${stoveLimit(level())}개까지 놓을 수 있어요`);
-  }
   if (s.inv[type] > 0) s.inv[type]--;
   else if (s.coins >= f.price) s.coins -= f.price;
   else return fail('코인이 모자라요');
@@ -685,17 +686,17 @@ export function storeItem(id) {
 }
 
 export const upgradeCost = st => STOVE_UPGRADE_COST[st.lv - 1] ?? null;
-export function upgradeStove(id) {
-  const s = G.state, st = itemById(id), cost = upgradeCost(st);
-  if (cost == null) return fail('더 강화할 수 없어요');
-  if (s.coins < cost) return fail('코인이 모자라요');
-  s.coins -= cost;
+const upgradeError = st => (upgradeCost(st) == null ? '더 강화할 수 없어요' : G.state.coins < upgradeCost(st) ? '코인이 모자라요' : null);
+function upgradeStove(id) {
+  const st = itemById(id), err = upgradeError(st);
+  if (err) return fail(err);
+  G.state.coins -= upgradeCost(st);
   st.lv++;
   emit('place');
   return true;
 }
 
-export function paintFloor(x, y, id) {
+function paintFloor(x, y, id) {
   const s = G.state, f = FLOORS[id], i = y * COLS + x;
   if (!inBounds(x, y) || s.floor[i] === id) return false;
   if (s.coins < f.price) return fail('코인이 모자라요');
@@ -704,7 +705,7 @@ export function paintFloor(x, y, id) {
   return true;
 }
 
-export function setWall(id) {
+function setWall(id) {
   const s = G.state, w = WALLS[id];
   if (!s.walls.includes(id)) {
     if (s.coins < w.price) return fail('코인이 모자라요');
@@ -726,17 +727,100 @@ export function setPhoto(photo) {
   return true;
 }
 
-export function expand() {
-  const s = G.state, cfg = EXPANSIONS[s.rows];
-  if (!cfg) return fail('더 넓힐 수 없어요');
-  if (level() < cfg.lv) return fail(`레벨 ${cfg.lv}부터 넓힐 수 있어요`);
-  if (s.coins < cfg.price) return fail('코인이 모자라요');
-  s.coins -= cfg.price;
+function expandError() {
+  const cfg = EXPANSIONS[G.state.rows];
+  if (!cfg) return '더 넓힐 수 없어요';
+  if (level() < cfg.lv) return `레벨 ${cfg.lv}부터 넓힐 수 있어요`;
+  return G.state.coins < cfg.price ? '코인이 모자라요' : null;
+}
+function expand() {
+  const s = G.state, err = expandError();
+  if (err) return fail(err);
+  s.coins -= EXPANSIONS[s.rows].price;
   s.rows++;
   s.floor.push(...Array(COLS).fill('wood'));
   emit('place');
   emit('resize');
   return true;
+}
+
+// ───── 구매 확정 ─────
+
+// 꾸미기에서 돈이 드는 일은 바로 하지 않고 G.edit.pending에 올려 둔다. 화면이 그 모습을 미리 보여 주고,
+// 플레이어가 구매 확정을 눌러야 confirmPending()이 실제로 산다. 돈이 안 드는 일(보관한 가구, 무료 바닥, 가진 벽지)은 바로 한다.
+// pending: {kind:'furn', type, x, y} | {kind:'floor', id, tiles:[칸 번호]} | {kind:'wall', id} | {kind:'expand'} | {kind:'upgrade', id}
+
+export function askPlace(type, x, y) {
+  const s = G.state;
+  if (s.inv[type] > 0) return place(type, x, y);
+  const err = placeError(type, x, y) || stoveLimitError(type) || (s.coins < FURN[type].price ? '코인이 모자라요' : null);
+  if (err) return fail(err);
+  G.edit.pending = { kind: 'furn', type, x, y };
+  return true;
+}
+
+// 칠할 칸을 하나씩 모은다. 모은 칸 값이 가진 코인을 넘으면 더 모으지 않는다.
+export function askPaint(x, y, id) {
+  const s = G.state, e = G.edit, f = FLOORS[id], i = y * COLS + x;
+  if (!inBounds(x, y) || s.floor[i] === id) return false;
+  if (!f.price) return paintFloor(x, y, id);
+  const p = e.pending?.kind === 'floor' && e.pending.id === id ? e.pending : { kind: 'floor', id, tiles: [] };
+  if (p.tiles.includes(i)) return false;
+  if ((p.tiles.length + 1) * f.price > s.coins) return fail('코인이 모자라요');
+  p.tiles.push(i);
+  e.pending = p;
+  return true;
+}
+
+export function askWall(id) {
+  const s = G.state;
+  G.edit.pending = null;
+  if (s.walls.includes(id)) return setWall(id);
+  if (s.coins < WALLS[id].price) return fail('코인이 모자라요');
+  G.edit.pending = { kind: 'wall', id };
+  return true;
+}
+
+export function askExpand() {
+  const err = expandError();
+  if (err) return fail(err);
+  G.edit.pending = { kind: 'expand' };
+  return true;
+}
+
+export function askUpgrade(id) {
+  const err = upgradeError(itemById(id));
+  if (err) return fail(err);
+  G.edit.pending = { kind: 'upgrade', id };
+  return true;
+}
+
+// 올려 둔 것의 이름과 값. 없으면 null.
+export function pendingInfo() {
+  const p = G.edit?.pending;
+  if (!p) return null;
+  switch (p.kind) {
+    case 'furn': return { name: FURN[p.type].name, cost: FURN[p.type].price };
+    case 'floor': return { name: `${FLOORS[p.id].name} ${p.tiles.length}칸`, cost: FLOORS[p.id].price * p.tiles.length };
+    case 'wall': return { name: WALLS[p.id].name, cost: WALLS[p.id].price };
+    case 'expand': return { name: '가게 한 줄 넓히기', cost: EXPANSIONS[G.state.rows].price };
+    default: return { name: `화구 ${itemById(p.id).lv + 1}단계로 강화`, cost: upgradeCost(itemById(p.id)) };
+  }
+}
+
+export function confirmPending() {
+  const p = G.edit.pending;
+  G.edit.pending = null;
+  switch (p.kind) {
+    case 'furn': return place(p.type, p.x, p.y);
+    case 'floor':
+      for (const i of p.tiles) paintFloor(i % COLS, Math.floor(i / COLS), p.id);
+      emit('place');
+      return true;
+    case 'wall': return setWall(p.id);
+    case 'expand': return expand();
+    default: return upgradeStove(p.id);
+  }
 }
 
 // ───── 시간 ─────

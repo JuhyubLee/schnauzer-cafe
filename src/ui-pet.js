@@ -6,6 +6,7 @@ import { sfx } from './sfx.js';
 
 export function createPetUI({ icon, coin, toast, openSheet, renderer, refresh }) {
   let current = null; // 지금 보고 있는 친구 id
+  let trying = null; // 사기 전에 입혀 보는 옷 id. 같은 옷을 한 번 더 눌러야(구매 확정) 산다.
 
   const speciesCards = (picked, worn, act) => Object.entries(PETS).map(([id, p]) =>
     `<button type="button" class="card ${id === picked ? 'on' : ''}" data-act="${act}" data-id="${id}">
@@ -16,6 +17,8 @@ export function createPetUI({ icon, coin, toast, openSheet, renderer, refresh })
     const s = G.state;
     const pet = petById(id) || s.pets[0];
     current = pet.id;
+    if (!again) trying = null;
+    const shown = trying ? { ...pet.wear, [WEAR[trying].slot]: trying } : pet.wear;
     const sideScroll = again ? [...document.querySelectorAll('#sheetBody .hscroll')].map(el => el.scrollLeft) : [];
 
     const chips = s.pets.map(p =>
@@ -25,9 +28,9 @@ export function createPetUI({ icon, coin, toast, openSheet, renderer, refresh })
 
     const closet = Object.entries(WEAR_SLOTS).map(([slot, slotName]) => {
       const cards = Object.entries(WEAR).filter(([, w]) => w.slot === slot).map(([wid, w]) => {
-        const wearing = pet.wear[slot] === wid;
-        const sub = wearing ? '입는 중' : s.closet.includes(wid) ? '입히기' : coin(w.price);
-        return `<button type="button" class="card ${wearing ? 'on' : ''}" data-act="wear" data-id="${wid}">
+        const wearing = pet.wear[slot] === wid, buying = trying === wid;
+        const sub = wearing ? '입는 중' : s.closet.includes(wid) ? '입히기' : buying ? `${coin(w.price)}<br>구매 확정` : coin(w.price);
+        return `<button type="button" class="card ${wearing ? 'on' : buying ? 'try' : ''}" data-act="wear" data-id="${wid}">
           <img class="px" src="${renderer.petURL(pet.species, { ...pet.wear, [slot]: wid })}" alt=""><b>${w.name}</b><small>${sub}</small></button>`;
       }).join('');
       return `<p><b>${slotName}</b></p><div class="hscroll">${cards}</div>`;
@@ -36,14 +39,14 @@ export function createPetUI({ icon, coin, toast, openSheet, renderer, refresh })
     openSheet(pet.name, `
       <div class="chips">${chips}</div>
       <div class="center stack">
-        <img class="px hero" src="${renderer.petURL(pet.species, pet.wear)}" alt="">
+        <img class="px hero" src="${renderer.petURL(pet.species, shown)}" alt="">
         <p>${PETS[pet.species].name} · <img class="px" src="${icon('heart')}" alt="" width="18" height="16"> 친밀도 <b id="petLove"></b></p>
         <button type="button" class="btn primary big" data-act="pet">${esc(pet.name)} 쓰다듬기</button>
         <p class="muted">쓰다듬으면 신나서 20초 동안 더 빨리 서빙해요. 가게에서 직접 눌러도 돼요.</p>
       </div>
       <hr>
       <p><b>옷장</b></p>
-      <p class="muted">산 옷은 모든 친구가 같이 입을 수 있어요. 입은 옷을 다시 누르면 벗어요.</p>
+      <p class="muted">없는 옷은 한 번 누르면 입혀 보고, 한 번 더 눌러 구매 확정해야 사요. 산 옷은 모든 친구가 같이 입을 수 있고, 입은 옷을 다시 누르면 벗어요.</p>
       ${closet}
       <hr>
       <label class="field">이름<input id="petName" maxlength="${PET_NAME_MAX}" value="${esc(pet.name)}" autocomplete="off"></label>
@@ -57,7 +60,15 @@ export function createPetUI({ icon, coin, toast, openSheet, renderer, refresh })
         adopt() { sfx('tap'); openAdopt(); },
         pet() { petPet(pet.id); },
         wear(el) {
-          if (!wear(pet.id, el.dataset.id)) return;
+          const wid = el.dataset.id;
+          if (!s.closet.includes(wid) && trying !== wid) {
+            trying = wid;
+            sfx('tap');
+            openPets(pet.id, true);
+            return;
+          }
+          trying = null;
+          if (!wear(pet.id, wid)) { openPets(pet.id, true); return; }
           sfx('place');
           changed();
         },
@@ -96,7 +107,13 @@ export function createPetUI({ icon, coin, toast, openSheet, renderer, refresh })
             draw($('adoptName').value);
             document.querySelector('#sheetBody .hscroll').scrollLeft = left;
           },
-          go() {
+          go(el) {
+            if (slot.price && !el.dataset.sure) {
+              el.dataset.sure = '1';
+              el.innerHTML = `구매 확정 ${coin(slot.price)}`;
+              sfx('tap');
+              return;
+            }
             const id = adopt(picked, $('adoptName').value.trim() || PETS[picked].nick);
             if (!id) return;
             sfx('level');
