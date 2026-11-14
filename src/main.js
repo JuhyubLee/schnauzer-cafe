@@ -114,14 +114,16 @@ window.addEventListener('pagehide', () => { if (G.state.started) save(); });
 comeBack();
 
 // ── 매 프레임 ──
-let last = performance.now(), uiT = 0, saveT = 0;
+// 바뀐 게 있으면 그 프레임에 바로 저장한다. 브라우저를 그냥 꺼도 마지막 조작이 남게.
+// 바뀐 게 없어도 5초마다 저장해서 '마지막으로 본 시각'을 새로 적는다.
+let last = performance.now(), uiT = 0, saveT = 0, saved = '';
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
   tick(dt);
   renderer.draw();
   if ((uiT += dt) > 0.25) { uiT = 0; ui.refresh(); }
-  if ((saveT += dt) > 5) { saveT = 0; if (G.state.started) save(); }
+  if (G.state.started && ((saveT += dt) > 5 || JSON.stringify(G.state) !== saved)) { saveT = 0; saved = save(); }
   requestAnimationFrame(frame);
 }
 fit();

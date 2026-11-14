@@ -58,10 +58,12 @@ function freshWorld() {
 
 // ───── 저장 ─────
 
+// 저장하고, 저장한 글(JSON)을 돌려준다.
 export function save() {
-  if (!G.state) return;
   G.state.lastSeen = Date.now();
-  try { localStorage.setItem(SAVE_KEY, JSON.stringify(G.state)); } catch { /* 저장 공간이 막힌 브라우저 */ }
+  const json = JSON.stringify(G.state);
+  try { localStorage.setItem(SAVE_KEY, json); } catch { /* 저장 공간이 막힌 브라우저 */ }
+  return json;
 }
 
 export function load() {
