@@ -76,6 +76,7 @@ function playTap(p) {
   }
   if (pet) { petPet(pet.id); return; }
 
+  if (G.visit) return; // 구경 중에는 남의 화구를 건드리지 않는다
   const it = renderer.pickItem(p.x, p.y);
   if (it?.type !== 'stove') return;
   if (cookState(it) === 'idle') { sfx('tap'); ui.openCook(it.id); }
@@ -123,16 +124,21 @@ document.addEventListener('pointerdown', syncMusic);
 
 // ── 자리를 비웠다 돌아왔을 때 ──
 function comeBack() {
-  if (!G.state.started) return;
+  if (!G.state.started || G.visit) return;
   const result = catchUp();
   if (result) ui.showWelcome(result);
 }
+on('home', comeBack); // 놀러 갔다 돌아왔을 때도 그동안 팔린 것을 정산한다
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { if (G.state.started) save(); } else comeBack();
   syncMusic();
 });
 window.addEventListener('pagehide', () => { if (G.state.started) save(); });
 comeBack();
+
+// ── 초대장 링크(주소 뒤 #visit=...)로 들어왔을 때 ──
+ui.handleInvite(location.hash);
+window.addEventListener('hashchange', () => ui.handleInvite(location.hash));
 
 // ── 매 프레임 ──
 // 바뀐 게 있으면 그 프레임에 바로 저장한다. 브라우저를 그냥 꺼도 마지막 조작이 남게.
@@ -144,7 +150,7 @@ function frame(now) {
   tick(dt);
   renderer.draw();
   if ((uiT += dt) > 0.25) { uiT = 0; ui.refresh(); }
-  if (G.state.started && ((saveT += dt) > 5 || JSON.stringify(G.state) !== saved)) { saveT = 0; saved = save(); }
+  if (G.state.started && !G.visit && ((saveT += dt) > 5 || JSON.stringify(G.state) !== saved)) { saveT = 0; saved = save(); }
   requestAnimationFrame(frame);
 }
 fit();

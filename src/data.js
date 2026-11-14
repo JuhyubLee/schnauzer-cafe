@@ -54,6 +54,10 @@ export const PETS = {
 export const PET_SLOTS = [{ lv: 1, price: 0 }, { lv: 4, price: 600 }, { lv: 8, price: 2500 }];
 export const PET_NAME_MAX = 6;
 
+// 놀러 가기: 친구 가게를 구경하고 오면 받는 코인. 가게마다 하루 한 번, 하루에 GIFTS_PER_DAY번까지.
+export const VISIT_GIFT = 30;
+export const GIFTS_PER_DAY = 3;
+
 // 옷. slot마다 하나씩 입는다. 그림은 sprites.js의 wear_<id>.
 export const WEAR_SLOTS = { hat: '모자', neck: '목', body: '옷' };
 export const WEAR = {

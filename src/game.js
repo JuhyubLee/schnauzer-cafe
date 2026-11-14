@@ -18,7 +18,8 @@ const OFFLINE_CAP = 8 * 3600;
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 // state: 저장되는 것. world: 화면에 돌아다니는 것(저장 안 함). edit: 꾸미기 중일 때만 있음.
-export const G = { state: null, world: null, edit: null };
+// visit: 친구 가게를 구경하는 중일 때만 있음. 그동안 state는 친구 가게(임시)이고 내 가게는 home에 있다.
+export const G = { state: null, world: null, edit: null, visit: null, home: null };
 
 const listeners = {};
 export const on = (evt, fn) => { (listeners[evt] ||= []).push(fn); };
@@ -90,7 +91,9 @@ function syncPets() {
 // ───── 저장 ─────
 
 // 저장하고, 저장한 글(JSON)을 돌려준다.
+// 구경 중에는 state가 남의 가게라서 절대 저장하지 않는다. (저장하면 내 가게가 덮인다)
 export function save() {
+  if (G.visit) return null;
   G.state.lastSeen = Date.now();
   const json = JSON.stringify(G.state);
   try { localStorage.setItem(SAVE_KEY, json); } catch { /* 저장 공간이 막힌 브라우저 */ }
@@ -120,10 +123,37 @@ export function startGame({ shopName, petName, species }) {
   save();
 }
 
+// ───── 놀러 가기 ─────
+
+// 친구 가게(state)를 구경하기 시작한다. 거기서 일어난 일(판매, 쓰다듬기)은 돌아올 때 모두 버린다.
+// info: { name, sid } 구경 중인 가게
+export function enterVisit(state, info) {
+  if (G.visit) leaveVisit();
+  G.home = G.state;
+  G.state = state;
+  G.visit = info;
+  G.edit = null;
+  customCache = null;
+  freshWorld();
+  for (const c of state.custom) emit('custom', c.id);
+  emit('resize');
+}
+
+export function leaveVisit() {
+  if (!G.visit) return;
+  G.state = G.home;
+  G.home = null;
+  G.visit = null;
+  customCache = null;
+  freshWorld();
+  emit('resize');
+  emit('home');
+}
+
 // ───── 백업 코드 ─────
 
 const BACKUP_PREFIX = 'CAFE1:';
-const MAX_ROWS = START_ROWS + Object.keys(EXPANSIONS).length;
+export const MAX_ROWS = START_ROWS + Object.keys(EXPANSIONS).length;
 
 // 붙여 넣은 백업이 이 게임이 읽을 수 있는 모양인지 본다. 잘린 코드나 엉뚱한 글을 걸러 낸다.
 function usable(s) {
@@ -210,6 +240,7 @@ export function josa(word, withBatchim, without) {
 
 export function hint() {
   const s = G.state;
+  if (G.visit) return `${G.visit.name}에 놀러 왔어요. 동물 친구를 눌러 쓰다듬어 보세요`;
   if (G.edit) return '';
   switch (s.tut) {
     case 0: return '화구를 눌러 첫 메뉴를 만들어 보세요';
@@ -309,6 +340,7 @@ function stepAlong(e, speed, dt) {
 // ───── 돈과 경험치 ─────
 
 function addXp(n) {
+  if (G.visit) return; // 구경 중인 가게는 자라지 않는다
   const s = G.state, before = level();
   s.xp += n;
   const after = level();

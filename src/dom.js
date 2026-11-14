@@ -5,3 +5,17 @@ export const esc = s => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<'
 export const setText = (el, text) => { if (el.textContent !== String(text)) el.textContent = text; };
 export const setHTML = (el, html) => { if (el._html !== html) { el._html = html; el.innerHTML = html; } };
 export const setSrc = (el, src) => { if (el.getAttribute('src') !== src) el.src = src; };
+
+// 글을 복사한다. https가 아닌 주소(집 와이파이 테스트)에는 clipboard API가 없어서 옛 방식으로 넘어간다.
+export async function copyText(text) {
+  if (navigator.clipboard) {
+    try { await navigator.clipboard.writeText(text); return true; } catch { /* 아래 방식으로 */ }
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  document.body.append(ta);
+  ta.select();
+  const ok = document.execCommand('copy');
+  ta.remove();
+  return ok;
+}

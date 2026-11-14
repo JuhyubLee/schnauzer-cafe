@@ -6,11 +6,12 @@ import {
   setWall, expand, save, reset, startGame, exportSave, importSave,
 } from './game.js';
 import { FURN, FLOORS, WALLS, EXPANSIONS, LEVEL_XP, PETS, MAX_CUSTOM, stoveLimit, fmtTime } from './data.js';
-import { $, esc, setText, setHTML, setSrc } from './dom.js';
+import { $, esc, setText, setHTML, setSrc, copyText } from './dom.js';
 import { sfx } from './sfx.js';
 import { syncMusic } from './music.js';
 import { createPetUI } from './ui-pet.js';
 import { createMenuUI } from './ui-menu.js';
+import { createVisitUI } from './ui-visit.js';
 
 export function initUI({ atlas, renderer }) {
   const icons = {};
@@ -19,7 +20,7 @@ export function initUI({ atlas, renderer }) {
   const petFace = pet => renderer.petURL(pet.species, pet.wear, true);
 
   $('coinIcon').src = icon('coin');
-  const navIcons = { cook: 'f_tteok', edit: 'hammer', notes: 'note' };
+  const navIcons = { cook: 'f_tteok', edit: 'hammer', visit: 'door', notes: 'note' };
   for (const [nav, name] of Object.entries(navIcons)) document.querySelector(`[data-nav="${nav}"] img`).src = icon(name);
 
   // ── 알림 ──
@@ -65,6 +66,7 @@ export function initUI({ atlas, renderer }) {
   const kit = { icon, coin, toast, openSheet, closeSheet, renderer, refresh };
   const petUI = createPetUI(kit);
   const menuUI = createMenuUI(kit);
+  const visitUI = createVisitUI(kit);
 
   // ── 요리 ──
   function openCook(stoveId = null) {
@@ -158,20 +160,6 @@ export function initUI({ atlas, renderer }) {
         },
       },
     });
-  }
-
-  // https가 아닌 주소(집 와이파이 테스트)에서는 clipboard API가 없어서 옛 방식으로 복사한다.
-  async function copyText(text) {
-    if (navigator.clipboard) {
-      try { await navigator.clipboard.writeText(text); return true; } catch { /* 아래 방식으로 */ }
-    }
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    document.body.append(ta);
-    ta.select();
-    const ok = document.execCommand('copy');
-    ta.remove();
-    return ok;
   }
 
   // ── 설정 ──
@@ -370,6 +358,9 @@ export function initUI({ atlas, renderer }) {
     const s = G.state, lv = level();
     setText($('shopName'), s.shopName);
     setText($('coinNum'), s.coins);
+    // 구경 중에는 남의 가게라서 코인과 설정을 가린다.
+    $('coinBox').hidden = !!G.visit;
+    $('shopBtn').disabled = !!G.visit;
     setText($('lvNum'), `Lv ${lv}`);
     const lo = LEVEL_XP[lv - 1], hi = LEVEL_XP[lv];
     $('xpFill').style.width = hi ? `${Math.round(((s.xp - lo) / (hi - lo)) * 100)}%` : '100%';
@@ -390,7 +381,7 @@ export function initUI({ atlas, renderer }) {
     const btn = ev.target.closest('[data-nav]');
     if (!btn) return;
     sfx('tap');
-    ({ cook: openCook, edit: openEdit, pet: () => petUI.openPets(), notes: openNotes })[btn.dataset.nav]();
+    ({ cook: openCook, edit: openEdit, pet: () => petUI.openPets(), visit: visitUI.openNeighbors, notes: openNotes })[btn.dataset.nav]();
   });
   $('shopBtn').addEventListener('click', () => { sfx('tap'); openSettings(); });
 
@@ -435,5 +426,5 @@ export function initUI({ atlas, renderer }) {
   on('custom', id => { delete icons[`custom_${id}`]; });
 
   refresh();
-  return { refresh, renderEdit, openCook, showWelcome, toast };
+  return { refresh, renderEdit, openCook, showWelcome, toast, handleInvite: visitUI.handleInvite };
 }
