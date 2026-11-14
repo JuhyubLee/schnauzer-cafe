@@ -1,6 +1,7 @@
 // 캔버스 그리기. 논리 해상도(1칸 = 16px)로 그리고, 확대는 CSS가 한다.
 import { G, COLS, DOOR_X, cookState, patienceLeft, recipeOf, petById } from './game.js';
-import { FURN, FLOORS, WALLS, PETS } from './data.js';
+import { FURN, FLOORS, WALLS, PETS, PHOTO_W, PHOTO_H } from './data.js';
+import { skyAt, skyCSS, drawView } from './sky.js';
 
 export const TILE = 16;
 export const PAD = 4; // 좌우·아래 벽 두께
@@ -8,6 +9,11 @@ export const WALL_H = 40;
 export const VIEW_W = COLS * TILE + PAD * 2;
 export const viewH = rows => WALL_H + rows * TILE + PAD;
 export const tileAt = (px, py) => ({ x: Math.floor((px - PAD) / TILE), y: Math.floor((py - WALL_H) / TILE) });
+// 벽에 걸린 것들의 자리. 큰 액자는 누르면 사진을 고를 수 있어서 자리를 밖에서도 쓴다.
+const WINDOW_AT = { x: PAD + 4, y: 6 };
+const PET_FRAME_X = PAD + 38;
+export const PHOTO_RECT = { x: PAD + 62, y: 4, w: 28, h: 24 };
+const GLOW_R = 22; // 밤에 조명이 밝히는 둘레의 반지름
 
 const INK = '#3b2b2b';
 const HAT_ROOM = 3; // 모자가 동물 그림 위로 올라가는 줄 수
@@ -70,6 +76,49 @@ const WALL_PAINT = {
     g.fillStyle = '#e9fbf5';
     for (let y = 3, row = 0; y < h; y += 6, row++) for (let x = row % 2 ? 6 : 2; x < w; x += 8) g.fillRect(x, y, 2, 2);
   },
+  gingham(g, w, h) {
+    g.fillStyle = '#fff1ee'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#f9cdc8';
+    for (let x = 0; x < w; x += 8) g.fillRect(x, 0, 4, h);
+    for (let y = 0; y < h; y += 8) g.fillRect(0, y, w, 4);
+    g.fillStyle = '#f2a09c';
+    for (let y = 0; y < h; y += 8) for (let x = 0; x < w; x += 8) g.fillRect(x, y, 4, 4);
+  },
+  tile(g, w, h) {
+    g.fillStyle = '#f8fafc'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#cfd6de';
+    for (let y = 5, row = 0; y < h; y += 6, row++) {
+      g.fillRect(0, y, w, 1);
+      for (let x = row % 2 ? 5 : 0; x < w; x += 10) g.fillRect(x, y - 5, 1, 5);
+    }
+  },
+  plank(g, w, h) {
+    g.fillStyle = '#c98f5a'; g.fillRect(0, 0, w, h);
+    for (let x = 0; x < w; x += 8) {
+      g.fillStyle = '#d9a56c'; g.fillRect(x, 0, 1, h);
+      g.fillStyle = '#a56f3f'; g.fillRect(x + 7, 0, 1, h);
+      g.fillStyle = '#b47b46'; g.fillRect(x + 3, (x * 5) % (h - 6), 1, 4); // 나뭇결
+    }
+  },
+  flower(g, w, h) {
+    g.fillStyle = '#fff4dc'; g.fillRect(0, 0, w, h);
+    for (let y = 3, row = 0; y < h; y += 8, row++) {
+      for (let x = row % 2 ? 9 : 3; x < w; x += 12) {
+        g.fillStyle = '#f58a1f'; g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3);
+        g.fillStyle = '#ffd34d'; g.fillRect(x, y, 1, 1);
+        g.fillStyle = '#66ad5c'; g.fillRect(x + 1, y + 2, 1, 1);
+      }
+    }
+  },
+  navy(g, w, h) {
+    g.fillStyle = '#2c3a66'; g.fillRect(0, 0, w, h);
+    for (let y = 4, row = 0; y < h; y += 7, row++) {
+      for (let x = row % 2 ? 10 : 3; x < w; x += 14) {
+        g.fillStyle = '#ffd34d'; g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3);
+        g.fillStyle = '#5b6ea3'; g.fillRect(x + 6, y + 3, 1, 1);
+      }
+    }
+  },
 };
 
 export function createRenderer(canvas, atlas) {
@@ -77,6 +126,35 @@ export function createRenderer(canvas, atlas) {
   const floors = Object.fromEntries(Object.keys(FLOORS).map(id => [id, makeCanvas(16, 16, FLOOR_PAINT[id])]));
   const walls = Object.fromEntries(Object.keys(WALLS).map(id =>
     [id, makeCanvas(VIEW_W, WALL_H - 5, c => WALL_PAINT[id](c, VIEW_W, WALL_H - 5))]));
+  // 원을 세 겹 겹쳐서 가운데가 더 밝은 빛
+  const lampGlow = makeCanvas(GLOW_R * 2 + 1, GLOW_R * 2 + 1, c => {
+    for (const [r, alpha] of [[GLOW_R, 0.08], [14, 0.1], [7, 0.1]]) {
+      c.fillStyle = `rgba(255,186,110,${alpha})`;
+      for (let y = -r; y <= r; y++) {
+        const half = Math.floor(Math.sqrt(r * r - y * y));
+        c.fillRect(GLOW_R - half, GLOW_R + y, half * 2 + 1, 1);
+      }
+    }
+  });
+
+  // 하늘 모습은 1초에 한 번만 다시 계산한다.
+  let sky = skyAt(new Date()), skyMs = Date.now();
+
+  // 액자 사진은 저장에 글(data URL)로 들어 있어서, 바뀔 때만 그림으로 풀어 둔다. 풀리기 전에는 null.
+  let photoSrc = null, photoImg = null;
+  function photoOf(s) {
+    const src = s.photo || null;
+    if (src !== photoSrc) {
+      photoSrc = src;
+      photoImg = null;
+      if (src) {
+        const img = new Image();
+        img.onload = () => { if (photoSrc === src) photoImg = img; };
+        img.src = src;
+      }
+    }
+    return photoImg;
+  }
 
   const spr = (name, x, y) => g.drawImage(atlas[name], Math.round(x), Math.round(y));
   // 스프라이트를 칸 아래쪽 가운데에 맞춰 그린다. (tx, ty)는 소수여도 된다.
@@ -132,23 +210,37 @@ export function createRenderer(canvas, atlas) {
     g.fillStyle = color; g.fillRect(x + 1, y + 1, Math.round((w - 2) * Math.max(0, Math.min(1, ratio))), 2);
   }
 
-  function drawRoom(s) {
+  function drawRoom(s, time) {
     const h = canvas.height;
     g.drawImage(walls[s.wall], 0, 0);
     g.fillStyle = '#6b4329'; g.fillRect(0, WALL_H - 5, VIEW_W, 5);
     g.fillStyle = '#9a6842'; g.fillRect(0, WALL_H - 5, VIEW_W, 1);
-    spr('window', PAD + 6, 8);
-    spr('frame', PAD + 54, 8);
+
+    drawView(g, WINDOW_AT.x + 2, WINDOW_AT.y + 2, sky, time);
+    spr('window', WINDOW_AT.x, WINDOW_AT.y);
+    g.fillStyle = 'rgba(255,255,255,0.4)'; // 유리에 비친 빛
+    g.fillRect(WINDOW_AT.x + 9, WINDOW_AT.y + 5, 1, 1); g.fillRect(WINDOW_AT.x + 8, WINDOW_AT.y + 6, 1, 1);
+
+    spr('frame', PET_FRAME_X, 8);
     if (s.pets[0]) {
-      // 액자 안쪽에 첫 번째 친구 얼굴
+      // 작은 액자 안쪽에 첫 번째 친구 얼굴
       g.save();
       g.beginPath();
-      g.rect(PAD + 56, 10, 14, 12);
+      g.rect(PET_FRAME_X + 2, 10, 14, 12);
       g.clip();
-      g.drawImage(atlas[`pet_${s.pets[0].species}_a`], PAD + 53, 10);
+      g.drawImage(atlas[`pet_${s.pets[0].species}_a`], PET_FRAME_X - 1, 10);
       g.restore();
     }
-    spr('door', PAD + DOOR_X * TILE, WALL_H - 24);
+
+    const photo = photoOf(s);
+    if (photo) g.drawImage(photo, PHOTO_RECT.x + 3, PHOTO_RECT.y + 3, PHOTO_W, PHOTO_H);
+    else spr('painting', PHOTO_RECT.x + 3, PHOTO_RECT.y + 3);
+    spr('photoframe', PHOTO_RECT.x, PHOTO_RECT.y);
+
+    const doorX = PAD + DOOR_X * TILE, doorY = WALL_H - 24;
+    spr('door', doorX, doorY);
+    g.fillStyle = skyCSS(sky); g.fillRect(doorX + 4, doorY + 4, 8, 4); // 문 유리에도 바깥 하늘이 비친다
+    g.fillStyle = 'rgba(255,255,255,0.5)'; g.fillRect(doorX + 6, doorY + 5, 1, 1); g.fillRect(doorX + 5, doorY + 6, 1, 1);
     for (let y = 0; y < s.rows; y++) {
       for (let x = 0; x < COLS; x++) g.drawImage(floors[s.floor[y * COLS + x]], PAD + x * TILE, WALL_H + y * TILE);
     }
@@ -160,6 +252,25 @@ export function createRenderer(canvas, atlas) {
     g.fillStyle = '#9a6842';
     g.fillRect(PAD - 1, WALL_H, 1, h - WALL_H - PAD + 1); g.fillRect(VIEW_W - PAD, WALL_H, 1, h - WALL_H - PAD + 1);
     g.fillRect(PAD - 1, h - PAD, VIEW_W - PAD * 2 + 2, 1);
+  }
+
+  // 시각에 맞춰 가게 안을 물들인다. 해 뜨고 질 때는 노을빛, 밤에는 어둡게. 밤에는 조명 둘레가 밝다.
+  function drawLight(s) {
+    const h = canvas.height;
+    if (sky.glow > 0.02) {
+      g.fillStyle = sky.dawn ? `rgba(255,170,150,${sky.glow * 0.08})` : `rgba(255,130,60,${sky.glow * 0.1})`;
+      g.fillRect(0, 0, VIEW_W, h);
+    }
+    if (sky.dark < 0.02) return;
+    g.fillStyle = `rgba(18,22,58,${sky.dark * 0.3})`;
+    g.fillRect(0, 0, VIEW_W, h);
+    g.globalCompositeOperation = 'lighter';
+    g.globalAlpha = sky.dark;
+    for (const it of s.items) {
+      if (FURN[it.type].light) g.drawImage(lampGlow, PAD + it.x * TILE + 8 - GLOW_R, WALL_H + (it.y + 1) * TILE - 18 - GLOW_R);
+    }
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
   }
 
   function drawItem(it, time) {
@@ -264,7 +375,9 @@ export function createRenderer(canvas, atlas) {
       canvas.width = VIEW_W; canvas.height = viewH(s.rows);
     }
     g.imageSmoothingEnabled = false;
-    drawRoom(s);
+    const nowMs = Date.now();
+    if (nowMs - skyMs > 1000) { sky = skyAt(new Date(nowMs)); skyMs = nowMs; }
+    drawRoom(s, time);
 
     const list = [];
     for (const it of s.items) {
@@ -289,7 +402,11 @@ export function createRenderer(canvas, atlas) {
     for (const d of list) d.draw();
 
     if (G.edit) drawEdit(s, G.edit, time);
-    else drawOverlays(s, w, time);
+    else {
+      // 밝기 설정은 구경 중에도 내 가게의 것을 따른다.
+      if ((G.home || s).dim !== false) drawLight(s);
+      drawOverlays(s, w, time);
+    }
   }
 
   // 화면 좌표의 가구를 찾는다. 키 큰 가구는 윗부분 8px까지 눌린다.

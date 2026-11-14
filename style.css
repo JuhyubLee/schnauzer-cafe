@@ -286,6 +286,7 @@ small { font-size: 14px; }
 }
 .center { text-align: center; }
 .center img.hero { width: 96px; height: 96px; object-fit: contain; }
+.center img.photo { width: 176px; height: 144px; }
 .stack > * + * { margin-top: 8px; }
 .pair { display: flex; gap: 8px; }
 .pair > * { flex: 1; }

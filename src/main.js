@@ -5,7 +5,7 @@ import {
 } from './game.js';
 import { fmtTime } from './data.js';
 import { buildAtlas, setSprite } from './sprites.js';
-import { createRenderer, VIEW_W, viewH, tileAt, TILE, PAD, WALL_H } from './render.js';
+import { createRenderer, VIEW_W, viewH, tileAt, TILE, PAD, WALL_H, PHOTO_RECT } from './render.js';
 import { initUI } from './ui.js';
 import { sfx } from './sfx.js';
 import { syncMusic } from './music.js';
@@ -79,7 +79,9 @@ function playTap(p) {
   }
   if (pet) { petPet(pet.id); return; }
 
-  if (G.visit) return; // 구경 중에는 남의 화구를 건드리지 않는다
+  if (G.visit) return; // 구경 중에는 남의 화구와 액자를 건드리지 않는다
+  // 벽의 큰 액자: 누르기 쉽게 둘레 3px까지 받는다
+  if (inRect(p, PHOTO_RECT.x - 3, PHOTO_RECT.y - 3, PHOTO_RECT.w + 6, PHOTO_RECT.h + 6)) { sfx('tap'); ui.openPhoto(); return; }
   const it = renderer.pickItem(p.x, p.y);
   if (it?.type !== 'stove') return;
   if (cookState(it) === 'idle') { sfx('tap'); ui.openCook(it.id); }

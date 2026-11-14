@@ -27,15 +27,19 @@ export const MAX_CUSTOM = 6;
 export const CUSTOM_NAME_MAX = 10;
 
 // block: 지나갈 수 없음, charm: 분위기 점수(손님이 더 자주 오고 팁을 준다)
+// table: 옆에 스툴을 붙이면 손님 자리가 되는 가구, light: 밤에 둘레를 밝히는 가구
 export const FURN = {
   stool: { name: '주황 스툴', sprite: 'stool', price: 25, lv: 1, block: true },
-  table: { name: '원목 테이블', sprite: 'table', price: 60, lv: 1, block: true },
+  table: { name: '원목 테이블', sprite: 'table', price: 60, lv: 1, block: true, table: true },
+  table_white: { name: '하얀 테이블', sprite: 'table_white', price: 90, lv: 2, block: true, table: true, charm: 1 },
+  table_orange: { name: '주황 테이블', sprite: 'table_orange', price: 110, lv: 3, block: true, table: true, charm: 1 },
+  table_check: { name: '체크 식탁보 테이블', sprite: 'table_check', price: 160, lv: 5, block: true, table: true, charm: 2 },
   stove: { name: '화구', sprite: 'stove', price: 250, lv: 1, block: true },
   plant: { name: '초록 화분', sprite: 'plant', price: 40, lv: 1, block: true, charm: 2 },
   rug: { name: '주황 러그', sprite: 'rug', price: 30, lv: 2, block: false, charm: 1 },
   dogbed: { name: '폭신 방석', sprite: 'dogbed', price: 90, lv: 2, block: false, charm: 2 },
   flower: { name: '주황 꽃 화분', sprite: 'flower', price: 70, lv: 3, block: true, charm: 3 },
-  lamp: { name: '스탠드 조명', sprite: 'lamp', price: 120, lv: 4, block: true, charm: 4 },
+  lamp: { name: '스탠드 조명', sprite: 'lamp', price: 120, lv: 4, block: true, charm: 4, light: true },
   shelf: { name: '책장', sprite: 'shelf', price: 180, lv: 5, block: true, charm: 5 },
 };
 
@@ -59,7 +63,7 @@ export const VISIT_GIFT = 30;
 export const GIFTS_PER_DAY = 3;
 
 // 앱 정보. 버전은 스토어에 올릴 때마다 올린다(android/app/build.gradle, ios 프로젝트와 같이).
-export const APP_VERSION = '1.0.0';
+export const APP_VERSION = '1.1.0';
 // 웹 버전이 있는 주소. 초대장 링크와 개인정보 처리방침이 여기에 있다. 바꾸면 이미 보낸 초대장이 안 열린다.
 export const SITE_URL = 'https://juhyublee.github.io/schnauzer-cafe/';
 export const PRIVACY_URL = `${SITE_URL}privacy.html`;
@@ -97,9 +101,19 @@ export const FLOORS = {
 export const WALLS = {
   cream: { name: '크림 벽지', price: 0, lv: 1 },
   orange: { name: '주황 줄무늬', price: 150, lv: 2 },
+  gingham: { name: '분홍 체크', price: 200, lv: 3 },
+  tile: { name: '하얀 타일', price: 250, lv: 3 },
   brick: { name: '빨간 벽돌', price: 300, lv: 4 },
   mint: { name: '민트 도트', price: 300, lv: 5 },
+  plank: { name: '나무 판벽', price: 450, lv: 6 },
+  flower: { name: '꽃무늬 벽지', price: 600, lv: 7 },
+  navy: { name: '남색 별무늬', price: 900, lv: 9 },
 };
+
+// 벽 액자에 거는 사진의 크기(픽셀). 고른 사진을 이 크기로 줄여서 저장한다.
+export const PHOTO_W = 22;
+export const PHOTO_H = 18;
+export const PHOTO_MAX_CHARS = 12000;
 
 export const START_ROWS = 6;
 // 확장: 현재 줄 수 → 다음 줄을 여는 조건

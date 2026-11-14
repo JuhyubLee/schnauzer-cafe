@@ -38,7 +38,7 @@ function withOutline(rows) {
 
 // ───── 가구 ─────
 
-def('table', [
+const TABLE_ROWS = [
   '................',
   '....tttttttt....',
   '..tttttttttttt..',
@@ -48,6 +48,27 @@ def('table', [
   '..TtttttttttTT..',
   '....TTTTTTTT....',
   '......BBBB......',
+  '.......BB.......',
+  '.......BB.......',
+  '.......BB.......',
+  '.....BBBBBB.....',
+  '................',
+  '................',
+  '................',
+];
+def('table', TABLE_ROWS);
+def('table_white', TABLE_ROWS, { pal: { t: PAL.w, T: PAL.l, B: PAL.g } });
+def('table_orange', TABLE_ROWS, { pal: { t: PAL.a, T: PAL.o, B: PAL.G } });
+def('table_check', [
+  '................',
+  '....wwrrwwrr....',
+  '..rrwwrrwwrrww..',
+  '..wwrrwwrrwwrr..',
+  '..wwrrwwrrwwrr..',
+  '..rrwwrrwwrrww..',
+  '..RRccRRccRRcc..',
+  '..ccRRccRRccRR..',
+  '...cRRccRRccR...',
   '.......BB.......',
   '.......BB.......',
   '.......BB.......',
@@ -272,25 +293,33 @@ def('door', [
   'kkkkkkkkkkkkkkkk',
 ], { outline: false });
 
+// 창문. 유리(가운데 24×15, '.')는 비워 두고 render.js가 그 뒤에 시각과 계절에 맞는 바깥 풍경을 그린다.
+const winRow = (left, right) => `kb${left}bb${right}bk`;
+const WIN_BAR = `k${'b'.repeat(26)}k`;
 def('window', [
-  'kkkkkkkkkkkkkkkkkkkkkkkk',
-  'kbbbbbbbbbbbbbbbbbbbbbbk',
-  'kbooouuuuuubbuuuuuuooobk',
-  'kboouuwuuuubbuuuuuuuoobk',
-  'kboouwuuuuubbuuwuuuuoobk',
-  'kbouuuuuuuubbuwuuuuuuobk',
-  'kbouuuuuuuubbuuuuuuuuobk',
-  'kbbbbbbbbbbbbbbbbbbbbbbk',
-  'kbouuuuuuuubbuuuuuuuuobk',
-  'kbouuuuuuUUbbuuuuuuUUobk',
-  'kboouuuUUUUbbuuuuUUUoobk',
-  'kboooUUUUUUbbUUUUUUooobk',
-  'kbbbbbbbbbbbbbbbbbbbbbbk',
-  'kccccccccccccccccccccCCk',
-  'kkkkkkkkkkkkkkkkkkkkkkkk',
+  'k'.repeat(28),
+  WIN_BAR,
+  winRow('ooooooooooo', 'ooooooooooo'),
+  winRow('OoOoOoOoOoO', 'OoOoOoOoOoO'),
+  winRow('ooo........', '........ooo'),
+  winRow('oo.........', '.........oo'),
+  winRow('oo.........', '.........oo'),
+  winRow('o..........', '..........o'),
+  winRow('o..........', '..........o'),
+  WIN_BAR,
+  winRow('o..........', '..........o'),
+  winRow('o..........', '..........o'),
+  winRow('oo.........', '.........oo'),
+  winRow('oo.........', '.........oo'),
+  winRow('ooo........', '...n....ooo'),
+  winRow('ooo........', '..nNn...ooo'),
+  winRow('oooo.......', '..TtT..oooo'),
+  WIN_BAR,
+  `k${'c'.repeat(24)}CCk`,
+  'k'.repeat(28),
 ], { outline: false });
 
-// 벽 액자. 안쪽(14×12)에는 첫 번째 친구 얼굴을 그려 넣는다(render.js).
+// 작은 액자. 안쪽(14×12)에는 첫 번째 친구 얼굴을 그려 넣는다(render.js).
 const FRAME_INNER = 'kycccccccccccccCyk';
 def('frame', [
   'kkkkkkkkkkkkkkkkkk',
@@ -299,6 +328,39 @@ def('frame', [
   'kycCCCCCCCCCCCCCyk',
   'kyyyyyyyyyyyyyyyyk',
   'kkkkkkkkkkkkkkkkkk',
+], { outline: false });
+
+// 큰 액자. 안쪽(22×18, '.')에는 플레이어가 고른 사진이나 아래 기본 그림이 들어간다.
+const PHOTO_EDGE = `ky${'Y'.repeat(24)}yk`;
+def('photoframe', [
+  'k'.repeat(28),
+  `k${'y'.repeat(26)}k`,
+  PHOTO_EDGE,
+  ...Array(18).fill(`kyY${'.'.repeat(22)}Yyk`),
+  PHOTO_EDGE,
+  `k${'y'.repeat(26)}k`,
+  'k'.repeat(28),
+], { outline: false });
+
+def('painting', [
+  'uuuuuuuuuuuuuuuuuuuuuu',
+  'uuuuuuuuuuuuuuuuwwuuuu',
+  'uuuuyyuuuuuuuuuwwwwuuu',
+  'uuuyyyyuuuuuuuuuuuuuuu',
+  'uuuyyyyuuuuuuuuuuuuuuu',
+  'uuuuyyuuuuuuuuuuuuuuuu',
+  'uuuuuuuuuuuuNuuuuuuuuu',
+  'uuuuuuuuuuuNNNuuuuuuuu',
+  'uuuuuuuuuuNNNNNuuuuuuu',
+  'uuuuunuuuNNNNNNNuuuuuu',
+  'uuuunnnuNNNNNNNNNuuuuu',
+  'uuunnnnnNNNNNNNNNNuuuu',
+  'uunnnnnnnNNNNNNNNNNuuu',
+  'unnnnnnnnnnNNNNNNNNNuu',
+  'nnnnnnnnnnnnnnNNNNNNNn',
+  'nnnnnnnnnnnnnnnnnnnnnn',
+  'nnnonnnnnnnnnnnnpnnnnn',
+  'nnnnnnnnnnonnnnnnnnnnn',
 ], { outline: false });
 
 // ───── 동물 친구 ─────

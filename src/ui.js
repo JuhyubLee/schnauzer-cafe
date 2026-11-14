@@ -15,6 +15,7 @@ import { syncMusic } from './music.js';
 import { createPetUI } from './ui-pet.js';
 import { createMenuUI } from './ui-menu.js';
 import { createVisitUI } from './ui-visit.js';
+import { createPhotoUI } from './ui-photo.js';
 
 export function initUI({ atlas, renderer }) {
   const icons = {};
@@ -70,6 +71,7 @@ export function initUI({ atlas, renderer }) {
   const petUI = createPetUI(kit);
   const menuUI = createMenuUI(kit);
   const visitUI = createVisitUI(kit);
+  const photoUI = createPhotoUI({ ...kit, onChange: () => renderEdit() });
 
   // ── 요리 ──
   function openCook(stoveId = null) {
@@ -175,6 +177,7 @@ export function initUI({ atlas, renderer }) {
           <button type="button" class="btn" data-act="music">${onOff('음악', s.music)}</button>
           <button type="button" class="btn" data-act="sound">${onOff('효과음', s.sound)}</button>
         </div>
+        <button type="button" class="btn" data-act="dim">${onOff('밤에 가게 어둡게', s.dim)}</button>
         <hr>
         <p><b>가게 백업</b></p>
         <p class="muted">백업 코드를 카톡 '나에게 보내기'에 붙여 두면, 폰을 바꾸거나 저장이 지워져도 가게를 되살릴 수 있어요.</p>
@@ -200,6 +203,7 @@ export function initUI({ atlas, renderer }) {
         },
         music(el) { s.music = !s.music; el.textContent = onOff('음악', s.music); save(); syncMusic(); },
         sound(el) { s.sound = !s.sound; el.textContent = onOff('효과음', s.sound); save(); sfx('tap'); },
+        dim(el) { s.dim = !s.dim; el.textContent = onOff('밤에 가게 어둡게', s.dim); save(); sfx('tap'); },
         async backup() {
           const code = exportSave();
           if (await copyText(code)) { toast('백업 코드를 복사했어요. 카톡에 붙여 두세요'); return; }
@@ -303,7 +307,9 @@ export function initUI({ atlas, renderer }) {
       }).join('');
     }
     if (e.tab === 'wall') {
-      return Object.entries(WALLS).map(([id, w]) => {
+      const photoCard = `<button type="button" class="card" data-act="photo">
+          <img class="px" src="${s.photo || icon('painting')}" alt=""><b>액자 사진</b><small>${s.photo ? '바꾸기' : '사진 걸기'}</small></button>`;
+      return photoCard + Object.entries(WALLS).map(([id, w]) => {
         const locked = w.lv > lv && !s.walls.includes(id);
         const sub = s.wall === id ? '사용 중' : s.walls.includes(id) ? '바꾸기' : locked ? `Lv ${w.lv}` : coin(w.price);
         return `<button type="button" class="card ${s.wall === id ? 'on' : ''}" data-act="wall" data-id="${id}" ${locked ? 'disabled' : ''}>
@@ -360,6 +366,7 @@ export function initUI({ atlas, renderer }) {
     else if (el.dataset.act === 'floor') Object.assign(e, { floor: e.floor === id ? null : id, sel: null });
     else if (el.dataset.act === 'wall') setWall(id);
     else if (el.dataset.act === 'expand') expand();
+    else if (el.dataset.act === 'photo') photoUI.open();
     sfx('tap');
     renderEdit();
   });
@@ -447,5 +454,8 @@ export function initUI({ atlas, renderer }) {
   on('custom', id => { delete icons[`custom_${id}`]; });
 
   refresh();
-  return { refresh, renderEdit, openCook, showWelcome, toast, back, handleInvite: visitUI.handleInvite };
+  return {
+    refresh, renderEdit, openCook, showWelcome, toast, back,
+    handleInvite: visitUI.handleInvite, openPhoto: photoUI.open,
+  };
 }

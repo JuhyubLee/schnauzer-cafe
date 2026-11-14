@@ -53,6 +53,8 @@
 	</array>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>NSCameraUsageDescription</key>
+	<string>벽 액자에 걸 사진을 바로 찍을 때 카메라를 써요. 찍은 사진은 기기 안에서 작은 그림으로 줄여 저장해요.</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

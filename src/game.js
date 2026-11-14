@@ -2,7 +2,7 @@
 import {
   RECIPES, RECIPE, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FLOORS, WALLS,
   PETS, PET_SLOTS, PET_NAME_MAX, WEAR, START_ROWS, EXPANSIONS,
-  STOVE_SPEED, STOVE_UPGRADE_COST, levelOf, stoveLimit,
+  STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, levelOf, stoveLimit,
 } from './data.js';
 import { CUSTOMER_LOOKS, validIcon } from './sprites.js';
 import { mirror } from './device.js';
@@ -46,7 +46,8 @@ function freshState() {
     pets: [], nextPet: 1, closet: [],
     custom: [], nextCustom: 1,
     notes: [],
-    tut: 0, sound: true, music: true,
+    tut: 0, sound: true, music: true, dim: true,
+    photo: null,
     stats: { sold: 0, cooked: 0 },
     lastSeen: Date.now(),
   };
@@ -67,6 +68,8 @@ function upgrade(s) {
   s.custom ??= [];
   s.nextCustom ??= 1;
   s.music ??= true;
+  s.dim ??= true;
+  s.photo ??= null;
   return s;
 }
 
@@ -170,6 +173,7 @@ function usable(s) {
     && int(s.rows) && s.rows >= START_ROWS && s.rows <= MAX_ROWS
     && Array.isArray(s.floor) && s.floor.length === s.rows * COLS && s.floor.every(f => has(FLOORS, f))
     && has(WALLS, s.wall) && Array.isArray(s.walls) && Array.isArray(s.notes)
+    && (s.photo === null || validPhoto(s.photo))
     && obj(s.inv) && obj(s.stock) && obj(s.stats)
     && Array.isArray(s.closet) && s.closet.every(id => has(WEAR, id))
     && Array.isArray(s.custom) && s.custom.length <= MAX_CUSTOM && s.custom.every(c => obj(c)
@@ -319,7 +323,7 @@ function seats() {
   const out = [];
   for (const st of G.state.items) {
     if (st.type !== 'stool') continue;
-    const d = DIRS.find(([dx, dy]) => itemAt(st.x + dx, st.y + dy)?.type === 'table');
+    const d = DIRS.find(([dx, dy]) => FURN[itemAt(st.x + dx, st.y + dy)?.type]?.table);
     if (d) out.push({ id: st.id, x: st.x, y: st.y, tx: st.x + d[0], ty: st.y + d[1] });
   }
   return out;
@@ -712,6 +716,16 @@ export function setWall(id) {
     emit('place');
   }
   s.wall = id;
+  return true;
+}
+
+// 벽 액자의 사진. 작게 줄인 PNG를 글(data URL)로 저장한다. null이면 기본 그림.
+// 백업 코드로도 들어오는 값이라, 화면에 그대로 넣어도 되는 글자만 받는다.
+export const validPhoto = v => typeof v === 'string' && v.length <= PHOTO_MAX_CHARS && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(v);
+export function setPhoto(photo) {
+  if (photo !== null && !validPhoto(photo)) return fail('이 사진은 쓸 수 없어요');
+  G.state.photo = photo;
+  save();
   return true;
 }
 
