@@ -18,12 +18,26 @@ let ctx = null;
 
 // 효과음과 음악이 같이 쓰는 오디오 장치. 소리를 못 내는 브라우저면 null.
 // 브라우저는 화면을 한 번 누른 뒤에야 소리를 허락한다.
+// 다른 앱에 다녀오면 장치가 잠들거나(suspended) 끊긴다(아이폰에서는 interrupted). 그래서 쓸 때마다 깨운다.
 export function audioCtx() {
   const AC = window.AudioContext || window.webkitAudioContext;
   if (!AC) return null;
-  ctx ||= new AC();
-  if (ctx.state === 'suspended') ctx.resume();
+  if (!ctx || ctx.state === 'closed') ctx = new AC();
+  if (ctx.state !== 'running') ctx.resume().catch(() => {});
   return ctx;
+}
+
+// 화면으로 돌아왔을 때 부른다. 장치를 깨워 보고, 잠깐 기다려도 안 깨어나면 버린다(다음에 쓸 때 새로 만든다).
+// 끊겼던 장치가 다시는 소리를 내지 않는 일이 아이폰에서 있어서다. 새 장치는 화면을 한 번 누르면 켜진다.
+const WAKE_WAIT = 300;
+export async function wakeAudio() {
+  if (!ctx || ctx.state === 'running') return;
+  const stale = ctx;
+  // 누르지 않은 상태에서는 깨우기가 끝나지 않고 계속 기다리게 될 수 있어서 시간을 정해 둔다.
+  await Promise.race([stale.resume().catch(() => {}), new Promise(done => setTimeout(done, WAKE_WAIT))]);
+  if (stale.state === 'running' || ctx !== stale) return;
+  ctx = null;
+  stale.close().catch(() => {});
 }
 
 export function sfx(name) {

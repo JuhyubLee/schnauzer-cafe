@@ -87,28 +87,34 @@ export function createPlayer(ctx, startAt = ctx.currentTime + 0.1) {
       }
     },
     stop() {
-      master.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
-      wet.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+      try {
+        master.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+        wet.gain.setTargetAtTime(0, ctx.currentTime, 0.08);
+      } catch { /* 이미 닫힌 장치 */ }
       setTimeout(() => { master.disconnect(); wet.disconnect(); }, 600);
     },
   };
 }
 
-let player = null, timer = 0;
+let player = null, playerCtx = null, timer = 0;
+
+function stopPlayer() {
+  clearInterval(timer);
+  player.stop();
+  player = null;
+}
 
 // 설정과 화면 상태에 맞춰 음악을 켜거나 끈다. 켜는 건 화면을 한 번 누른 뒤에만 된다.
 export function syncMusic() {
   const want = G.state.started && G.state.music && !document.hidden;
   const ctx = want ? audioCtx() : null; // 잠들어 있던 장치도 여기서 깨운다
   if (want && !ctx) return;
+  if (player && (!want || playerCtx !== ctx)) stopPlayer(); // 장치가 새로 만들어졌으면 연주기도 새로 만든다
   if (want && !player) {
     player = createPlayer(ctx);
+    playerCtx = ctx;
     const pump = () => player.fill(ctx.currentTime + 0.6);
     pump();
     timer = setInterval(pump, 200);
-  } else if (!want && player) {
-    clearInterval(timer);
-    player.stop();
-    player = null;
   }
 }
