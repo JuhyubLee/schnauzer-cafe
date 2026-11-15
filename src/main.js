@@ -7,7 +7,7 @@ import { fmtTime } from './data.js';
 import { buildAtlas, setSprite } from './sprites.js';
 import { createRenderer, viewW, viewH, tileAt, TILE, PAD, WALL_H, photoRect } from './render.js';
 import { initUI } from './ui.js';
-import { sfx, wakeAudio } from './sfx.js';
+import { sfx, resetAudio } from './sfx.js';
 import { syncMusic } from './music.js';
 import { restoreMirrored, onBack } from './device.js';
 
@@ -130,13 +130,12 @@ canvas.addEventListener('pointercancel', () => { press = null; });
 document.addEventListener('pointerdown', syncMusic);
 
 // ── 화면을 떠날 때 저장하고, 공유 중이면 바뀐 가게 모습을 서버에 올린다. 돌아오면 소리를 다시 켠다 ──
-document.addEventListener('visibilitychange', async () => {
+document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     if (G.state.started) { save(); ui.syncShop(true); }
-    syncMusic();
-    return;
+  } else {
+    resetAudio(); // 다른 앱에 다녀오는 동안 끊긴 오디오 장치를 새로 만들게 한다
   }
-  await wakeAudio(); // 다른 앱에 다녀오는 동안 끊긴 오디오 장치를 깨우거나 새로 만들게 한다
   syncMusic();
 });
 window.addEventListener('pagehide', () => { if (G.state.started) save(); });
