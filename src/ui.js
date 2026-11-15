@@ -17,6 +17,7 @@ import { createPetUI } from './ui-pet.js';
 import { createMenuUI } from './ui-menu.js';
 import { createVisitUI } from './ui-visit.js';
 import { createPhotoUI } from './ui-photo.js';
+import { sharing, stopSharing } from './visit.js';
 
 export function initUI({ atlas, renderer }) {
   const icons = {};
@@ -223,12 +224,14 @@ export function initUI({ atlas, renderer }) {
           delete el.dataset.sure;
           el.textContent = '이 코드로 되살리기';
         },
-        reset(el) {
+        async reset(el) {
           if (!el.dataset.sure) {
             el.dataset.sure = '1';
             el.textContent = '정말요? 한 번 더 누르면 모두 지워져요';
             return;
           }
+          el.disabled = true;
+          if (sharing()) await stopSharing(); // 서버에 올려 둔 가게 모습도 지운다(서버가 안 닿으면 반년 뒤에 지워진다)
           reset();
           location.reload();
         },
@@ -476,6 +479,6 @@ export function initUI({ atlas, renderer }) {
   refresh();
   return {
     refresh, renderEdit, openCook, toast, back,
-    handleInvite: visitUI.handleInvite, openPhoto: photoUI.open,
+    handleInvite: visitUI.handleInvite, syncShop: visitUI.syncShop, openPhoto: photoUI.open,
   };
 }

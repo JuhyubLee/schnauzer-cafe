@@ -1,7 +1,9 @@
-// 놀러 가기: 서버 없이 '초대장'을 주고받아 서로의 가게를 구경한다.
-// 초대장은 가게 모습만 담은 글(코드)이고, 주소 뒤에 붙여 링크로 보낸다.
-// 코인, 재고, 의견은 담지 않는다. 받은 초대장은 남이 만든 글이므로 하나하나 검사해서 쓴다.
+// 놀러 가기: '초대장'을 주고받아 서로의 가게를 구경한다.
+// 초대장은 가게 모습만 담은 글(코드)이고, 주소 뒤에 붙여 링크로 보낸다. 서버 없이도 읽힌다.
+// 코인, 재고, 의견, 액자 사진은 담지 않는다. 받은 초대장은 남이 만든 글이므로 하나하나 검사해서 쓴다.
+// '최신 모습 공유'를 켠 가게는 모습을 서버에도 올려 두어서, 놀러 올 때마다 그때의 모습을 보여 줄 수 있다.
 import { G, level, enterVisit, leaveVisit, save, MAX_ROWS, MAX_COLS } from './game.js';
+import { putShop, getShop, deleteShop, reportShop } from './cloud.js';
 import {
   RECIPES, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FLOORS, WALLS, PETS, PET_SLOTS, PET_NAME_MAX,
   WEAR, START_ROWS, START_COLS, START_DOOR, LEVEL_XP, VISIT_GIFT, GIFTS_PER_DAY, STOVE_SPEED, SITE_URL,
@@ -45,11 +47,23 @@ async function through(bytes, stream) {
 
 // ───── 초대장 만들기 ─────
 
+// 내 가게의 번호(sid)와 열쇠(skey). 서버에 올린 가게 모습은 이 열쇠로만 고치거나 지울 수 있다.
+// 저장(백업 코드)에 같이 들어 있어서, 기기를 옮겨도 같은 가게로 이어진다. 구경 중에는 내 가게가 G.home에 있다.
+const SID = /^[a-z0-9]{6,24}$/, SKEY = /^[a-f0-9]{32}$/;
+const randomKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+function mine() {
+  const s = G.home || G.state;
+  if (!SID.test(s.sid || '')) s.sid = friends().me; // 서버가 생기기 전에 보낸 초대장의 번호를 그대로 쓴다
+  if (!SKEY.test(s.skey || '')) s.skey = randomKey();
+  return s;
+}
+export const myId = () => mine().sid;
+
 // 내 가게의 겉모습만 추린다. 구경 중에는 부르지 않는다.
 export function makeSnapshot() {
   const s = G.state;
   return {
-    s: friends().me,
+    s: myId(),
     n: s.shopName,
     l: level(),
     r: s.rows,
@@ -149,12 +163,14 @@ const today = () => {
 };
 
 let cache = null;
-// { me: 내 가게 표시, list: [{sid, name, lv, code, got(받은 날), gift(선물 받은 날)}], day, gifts(오늘 받은 선물 수) }
+// { me: 처음 정해진 내 가게 번호, list: [{sid, name, lv, code, got(받은 날), gift(선물 받은 날)}], day, gifts(오늘 받은 선물 수),
+//   blocked: [{sid, name}] 차단한 가게 }
 export function friends() {
   if (cache) return cache;
   let f = null;
   try { f = JSON.parse(localStorage.getItem(FRIENDS_KEY)); } catch { /* 깨졌으면 새로 만든다 */ }
   cache = f && typeof f.me === 'string' && Array.isArray(f.list) ? f : { me: '', list: [], day: '', gifts: 0 };
+  if (!Array.isArray(cache.blocked)) cache.blocked = [];
   if (!/^[a-z0-9]{6,24}$/.test(cache.me)) {
     cache.me = Array.from(crypto.getRandomValues(new Uint8Array(8)), b => (b % 36).toString(36)).join('');
     store();
@@ -170,7 +186,7 @@ function store() {
 // 받은 초대장을 목록 맨 위에 적어 둔다. 같은 가게면 새 모습으로 바꾼다. 내 가게 초대장은 적지 않는다.
 export function rememberFriend(snap, code) {
   const f = friends();
-  if (snap.s === f.me) return;
+  if (snap.s === myId()) return;
   const old = f.list.find(e => e.sid === snap.s);
   const d = new Date();
   f.list = [
@@ -218,7 +234,7 @@ function shopFrom(snap) {
 }
 
 export function startVisit(snap) {
-  enterVisit(shopFrom(snap), { name: snap.n, sid: snap.s, mine: snap.s === friends().me });
+  enterVisit(shopFrom(snap), { name: snap.n, sid: snap.s, mine: snap.s === myId(), snap });
 }
 
 // 내 가게로 돌아온다. 방문 선물을 받았으면 그 코인 수, 아니면 0.
@@ -239,4 +255,79 @@ export function endVisit() {
   }
   store();
   return gift ? VISIT_GIFT : 0;
+}
+
+// ───── 최신 모습 공유 ─────
+
+export const sharing = () => !!(G.home || G.state).share;
+
+let pushed = null; // 마지막으로 서버에 보낸 모습(글). 같은 모습은 다시 보내지 않는다.
+let pushing = false;
+
+// 공유가 켜져 있고 가게 모습이 바뀌었으면 서버에 올린다.
+// 돌려주는 값: 'ok', 'words'(이름에 욕설이 있어 못 올림), 'moved'(가게 번호를 새로 받음), 그 밖의 서버 답, 할 일이 없었거나 서버가 안 닿으면 null
+export async function pushShop(keepalive = false) {
+  const s = G.state;
+  if (G.visit || G.edit || !s.started || !s.share || pushing) return null;
+  const snap = makeSnapshot(), text = JSON.stringify(snap);
+  if (text === pushed) return null;
+  pushing = true;
+  const result = await putShop(snap.s, s.skey, snap, keepalive);
+  pushing = false;
+  if (result === 'denied') {
+    // 서버에 있는 같은 번호의 가게와 열쇠가 다르다(공유를 켜기 전의 백업으로 되돌렸을 때). 새 번호로 다시 시작한다.
+    s.sid = randomKey().slice(0, 12);
+    s.skey = randomKey();
+    return 'moved';
+  }
+  if (result !== undefined) pushed = text; // 서버가 받지 않은 모습(욕설 등)도 같은 모습으로는 다시 묻지 않는다
+  return result ?? null;
+}
+
+export function startSharing() {
+  mine().share = true;
+  pushed = null;
+  return pushShop();
+}
+
+// 공유를 끄고 서버에 올려 둔 모습을 지운다. 서버에 닿지 않으면 끄지 않고 false.
+export async function stopSharing() {
+  const s = mine();
+  const result = await deleteShop(s.sid, s.skey);
+  if (result === undefined) return false;
+  s.share = false;
+  pushed = null;
+  return true;
+}
+
+// 구경하러 갈 때: 서버에 더 새로운 모습이 있으면 그것을, 없거나 서버가 안 닿으면 가지고 있던 모습을 돌려준다.
+// 운영자가 가려 둔 가게면 null.
+export async function latestOf(snap) {
+  const got = await getShop(snap.s);
+  if (got?.hidden) return null;
+  const fresh = got?.snap ? sanitize(got.snap) : null;
+  return fresh && fresh.s === snap.s ? fresh : snap;
+}
+
+// ───── 차단과 신고 ─────
+
+export const isBlocked = sid => friends().blocked.some(b => b.sid === sid);
+
+// 차단한 가게는 다녀온 가게에서 빠지고, 초대장을 받아도 열리지 않는다.
+export function block(sid, name) {
+  const f = friends();
+  if (!isBlocked(sid)) f.blocked.push({ sid, name });
+  f.list = f.list.filter(e => e.sid !== sid);
+  store();
+}
+
+export function unblock(sid) {
+  const f = friends();
+  f.blocked = f.blocked.filter(b => b.sid !== sid);
+  store();
+}
+
+// 보고 있던 모습과 함께 신고한다. 서버가 받았으면 true.
+export async function report(snap, reason) {
+  return (await reportShop(snap.s, reason, myId(), snap)) === 'ok';
 }

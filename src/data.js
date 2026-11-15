@@ -88,10 +88,13 @@ export const VISIT_GIFT = 30;
 export const GIFTS_PER_DAY = 3;
 
 // 앱 정보. 버전은 스토어에 올릴 때마다 올린다(android/app/build.gradle, ios 프로젝트와 같이).
-export const APP_VERSION = '1.1.0';
+export const APP_VERSION = '1.2.0';
 // 웹 버전이 있는 주소. 초대장 링크와 개인정보 처리방침이 여기에 있다. 바꾸면 이미 보낸 초대장이 안 열린다.
 export const SITE_URL = 'https://juhyublee.github.io/schnauzer-cafe/';
 export const PRIVACY_URL = `${SITE_URL}privacy.html`;
+// 가게 모습을 맡아 두는 서버(Supabase). 이 키는 앱에 넣어 쓰라고 나온 공개 키다. 가게 표는 직접 읽거나 쓸 수 없고 server/schema.sql의 함수로만 다룬다.
+export const SERVER_URL = 'https://pvqzntzwcuymnizcxkxz.supabase.co';
+export const SERVER_KEY = 'sb_publishable_OTD7C59V_E078KTx5ITbeg_joyFOWdS';
 
 // 옷. slot마다 하나씩 입는다. 그림은 sprites.js의 wear_<id>.
 export const WEAR_SLOTS = { hat: '모자', neck: '목', body: '옷' };

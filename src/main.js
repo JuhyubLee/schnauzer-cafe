@@ -129,9 +129,9 @@ canvas.addEventListener('pointercancel', () => { press = null; });
 // ── 음악: 브라우저가 화면을 한 번 누른 뒤에야 소리를 허락하므로, 누를 때마다 맞춰 본다 ──
 document.addEventListener('pointerdown', syncMusic);
 
-// ── 화면을 떠날 때 저장한다 ──
+// ── 화면을 떠날 때 저장하고, 공유 중이면 바뀐 가게 모습을 서버에 올린다 ──
 document.addEventListener('visibilitychange', () => {
-  if (document.hidden && G.state.started) save();
+  if (document.hidden && G.state.started) { save(); ui.syncShop(true); }
   syncMusic();
 });
 window.addEventListener('pagehide', () => { if (G.state.started) save(); });
@@ -145,7 +145,9 @@ onBack(ui.back);
 
 // ── 매 프레임 ──
 // 바뀐 게 있으면 그 프레임에 바로 저장한다. 브라우저를 그냥 꺼도 마지막 조작이 남게.
-let last = performance.now(), uiT = 0, saved = '';
+// 공유 중인 가게는 15초마다 바뀐 모습이 있는지 보고 서버에 올린다.
+const SYNC_EVERY = 15;
+let last = performance.now(), uiT = 0, syncT = SYNC_EVERY - 3, saved = '';
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
@@ -153,6 +155,7 @@ function frame(now) {
   renderer.draw();
   if ((uiT += dt) > 0.25) { uiT = 0; ui.refresh(); }
   if (G.state.started && !G.visit && JSON.stringify(G.state) !== saved) saved = save();
+  if ((syncT += dt) > SYNC_EVERY) { syncT = 0; ui.syncShop(); }
   requestAnimationFrame(frame);
 }
 fit();
