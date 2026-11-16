@@ -54,7 +54,11 @@ export function initUI({ atlas, renderer }) {
   // ── 올라오는 창 ──
   let sheetLive = null; // 창이 열려 있는 동안 주기적으로 부르는 갱신 함수
   let actions = {};
-  // opts: live(주기 갱신), actions(data-act → 함수), keepScroll(같은 창을 다시 그릴 때 스크롤 유지)
+  // 꼭 읽어야 하는 창(hold): 바깥을 눌러도 닫히지 않고, 뜬 직후 잠깐은 창 안의 단추도 안 먹는다.
+  // 다른 것을 연달아 누르던 손가락이 창을 읽기도 전에 닫아 버리지 않게 하려는 것이다.
+  const HOLD_MS = 800;
+  let held = false, armTimer = 0;
+  // opts: live(주기 갱신), actions(data-act → 함수), keepScroll(같은 창을 다시 그릴 때 스크롤 유지), hold(위 설명)
   function openSheet(title, html, opts = {}) {
     $('sheetTitle').textContent = title;
     const body = $('sheetBody');
@@ -62,6 +66,10 @@ export function initUI({ atlas, renderer }) {
     body.innerHTML = html;
     actions = opts.actions || {};
     sheetLive = opts.live || null;
+    held = !!opts.hold;
+    clearTimeout(armTimer);
+    $('sheet').classList.toggle('arming', held);
+    if (held) armTimer = setTimeout(() => $('sheet').classList.remove('arming'), HOLD_MS);
     $('sheetWrap').hidden = false;
     body.scrollTop = top; // 창이 보이는 상태에서만 먹힌다
     sheetLive?.();
@@ -71,10 +79,11 @@ export function initUI({ atlas, renderer }) {
     $('sheetBody').innerHTML = '';
     sheetLive = null;
     actions = {};
+    held = false;
   }
   const sheetOpen = () => !$('sheetWrap').hidden;
   $('sheetClose').addEventListener('click', () => { sfx('tap'); closeSheet(); });
-  $('sheetWrap').addEventListener('click', e => { if (e.target === $('sheetWrap')) closeSheet(); });
+  $('sheetWrap').addEventListener('click', e => { if (e.target === $('sheetWrap') && !held) closeSheet(); });
   $('sheetBody').addEventListener('click', e => {
     const el = e.target.closest('[data-act]');
     if (el && !el.disabled) actions[el.dataset.act]?.(el);
@@ -279,16 +288,24 @@ export function initUI({ atlas, renderer }) {
   }
 
   // ── 레벨 업 ──
-  function showLevelUp({ lv, reward, unlocks }) {
+  // 안내 창은 하나씩, 다른 창이나 꾸미기·구경이 끝난 뒤에 띄운다(refresh가 차례를 본다). 그동안 오른 레벨은 levelUps에 모아 둔다.
+  const levelUps = [];
+  function showLevelUp(info) {
     sfx('level');
-    if (sheetOpen() || G.edit) { toast(`레벨 ${lv}! 코인 ${reward}개를 받았어요`); return; }
+    levelUps.push(info);
+    if (sheetOpen() || G.edit) toast(`레벨 ${info.lv}! 코인 ${info.reward}개를 받았어요`);
+    else nextLevelUp();
+  }
+  function nextLevelUp() {
+    if (!levelUps.length || sheetOpen() || G.edit || G.visit) return;
+    const { lv, reward, unlocks } = levelUps.shift();
     const items = unlocks.map(u =>
       `<li>${u.icon ? `<img class="px" src="${icon(u.icon)}" alt="">` : ''}<span>${u.text}</span></li>`).join('');
     openSheet(`레벨 ${lv}!`, `<div class="stack">
         <p class="center">축하해요! 선물로 ${coin(reward)}개를 받았어요</p>
         <ul class="list">${items}</ul>
         <button type="button" class="btn primary big" data-act="ok">좋아요</button>
-      </div>`, { actions: { ok: closeSheet } });
+      </div>`, { hold: true, actions: { ok: closeSheet } });
   }
 
   // ── 꾸미기 ──
@@ -452,6 +469,7 @@ export function initUI({ atlas, renderer }) {
     $('hint').hidden = !h;
     setText($('hint'), h);
     sheetLive?.();
+    nextLevelUp();
   }
 
   // ── 아래 버튼 ──

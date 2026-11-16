@@ -242,6 +242,9 @@ small { font-size: 14px; }
   background: var(--paper);
   border-top: var(--edge);
 }
+/* 꼭 읽어야 하는 창이 뜬 직후: 잠깐 누르기가 안 먹고 단추가 흐리다(ui.js의 hold) */
+#sheet.arming { pointer-events: none; }
+#sheet.arming .btn { opacity: 0.5; }
 .sheet-head {
   display: flex;
   align-items: center;
