@@ -1,6 +1,6 @@
 // 골목 화면: 내 가게들을 보고 옮겨 다니고, 조건이 되면 새 가게를 연다. 문을 누르거나 가게 설정에서 연다.
 import { G, shopOfType, shopNo, openError, openShop, switchShop, furnOf, josa, managerOf, awaySales } from './game.js';
-import { SHOP_TYPES, SHOP_NAME_MAX, levelOf } from './data.js';
+import { SHOP_TYPES, SHOP_NAME_MAX, REGULAR_EVERY, levelOf } from './data.js';
 import { $, esc } from './dom.js';
 import { sfx } from './sfx.js';
 
@@ -17,6 +17,8 @@ export function createAlleyUI({ icon, coin, toast, news, openSheet, closeSheet, 
         return `<div class="row">${img}
           <span class="meta"><b>${no}호점 ${esc(shop.shopName)}</b>
             <small>${cfg.name} · Lv ${levelOf(shop.xp)} · ${coin(shop.coins)}</small>
+            <small>${cfg.trait}</small>
+            ${cfg.stay ? `<small>단골 ${shop.regulars || 0}명 · ${REGULAR_EVERY}명마다 감사 선물</small>` : ''}
             ${ready ? `<small>다 된 것 ${ready}개</small>` : ''}
             ${manager ? `<small>점장 ${esc(manager.name)}</small>` : ''}
             ${sold ? `<small>그동안 ${sold.n}번 팔았어요</small>` : ''}</span>
@@ -26,11 +28,11 @@ export function createAlleyUI({ icon, coin, toast, news, openSheet, closeSheet, 
       const { after, lv, price } = cfg.opens, from = shopOfType(after);
       if (!from || levelOf(from.xp) < lv) {
         return `<div class="row locked">${img}
-          <span class="meta"><b>${no}호점 ${cfg.name}</b><small>${openError(type)}</small></span><span class="right"></span></div>`;
+          <span class="meta"><b>${no}호점 ${cfg.name}</b><small>${openError(type)}</small><small>${cfg.trait}</small></span><span class="right"></span></div>`;
       }
       // 여는 조건(레벨)이 됐다. 코인이 모자라면 눌렀을 때 알려 준다.
       return `<div class="row">${img}
-          <span class="meta"><b>${no}호점 ${cfg.name}</b><small>이제 열 수 있어요</small></span><span class="right"></span></div>
+          <span class="meta"><b>${no}호점 ${cfg.name}</b><small>이제 열 수 있어요</small><small>${cfg.trait}</small></span><span class="right"></span></div>
         <label class="field">새 가게 이름<input id="openName" maxlength="${SHOP_NAME_MAX}" placeholder="우리 ${cfg.name}" autocomplete="off"></label>
         <button type="button" class="btn primary big" data-act="open" data-id="${type}">개업하기 ${coin(price)}</button>
         <p class="muted">개업 비용은 ${shopNo(after)}호점 지갑에서 내요. 새 가게는 코인 100개로 처음부터 키워요. 동물 친구, 옷, 도장, 보관한 가구는 가게들이 같이 써요.</p>`;

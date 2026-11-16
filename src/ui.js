@@ -4,11 +4,11 @@ import {
   G, on, level, hint, charm, seatCount, stoves, cookState, itemById, recipeOf, allRecipes, josa,
   startCook, collect, costOf, enterEdit, exitEdit, storeItem, upgradeCost, expandCfg,
   askWall, askExpand, askUpgrade, pendingInfo, confirmPending, save, reset, startGame, exportSave, importSave,
-  furnOf, levelIn, shopNo,
+  furnOf, levelIn, shopNo, rounds, regulars,
 } from './game.js';
 import {
   FURN, FURN_GROUPS, FLOORS, WALLS, SEASONS, EXPAND_DIRS, LEVEL_XP, PETS, BONDS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL,
-  SONG_CHOICES, SHOP_TYPES, stoveLimit, fmtTime, onSale, shopOf,
+  SONG_CHOICES, SHOP_TYPES, REGULAR_EVERY, stoveLimit, fmtTime, onSale, shopOf,
 } from './data.js';
 import { $, esc, setText, setHTML, setSrc, copyText } from './dom.js';
 import { share } from './device.js';
@@ -202,7 +202,8 @@ export function initUI({ atlas, renderer }) {
         <button type="button" class="btn big" data-act="alley">골목으로 나가기 (다른 가게)</button>
         <label class="field">가게 이름<input id="setShop" maxlength="12" value="${esc(s.shopName)}" autocomplete="off"></label>
         <button type="button" class="btn primary" data-act="name">이름 바꾸기</button>
-        <p class="muted">분위기 ${charm()} · 손님 자리 ${seatCount()}개 · 만든 횟수 ${s.stats.cooked}번</p>
+        <p class="muted">분위기 ${charm()} · 손님 자리 ${seatCount()}개 · 만든 횟수 ${s.stats.cooked}번${SHOP_TYPES[s.type].stay
+    ? `<br>손님마다 ${rounds()}번 주문 · 단골 ${regulars()}명 (${REGULAR_EVERY - regulars() % REGULAR_EVERY}명 더 생기면 감사 선물)` : ''}</p>
         <hr>
         <div class="pair">
           <button type="button" class="btn" data-act="music">${onOff('음악', s.music)}</button>
@@ -401,7 +402,9 @@ export function initUI({ atlas, renderer }) {
     if (e.place) return `<span class="grow"><b>${FURN[e.place].name}</b> · 놓을 칸을 누르세요</span>${stop}`;
     if (e.floor) return `<span class="grow"><b>${FLOORS[e.floor].name}</b> · 칠할 칸을 누르거나 문질러요</span>${stop}`;
     if (e.tab === 'expand') return `<span class="grow">넓힐 쪽을 골라 주세요</span><span>가로 ${G.state.cols}칸 · 세로 ${G.state.rows}줄</span>`;
-    return `<span class="grow">가구를 누르면 옮기거나 보관할 수 있어요</span><span>분위기 ${charm()} · 자리 ${seatCount()}개</span>`;
+    // 머무는 가게(카페)에서는 분위기가 손님이 시키는 횟수를 정하므로 같이 보여 준다.
+    const stay = SHOP_TYPES[G.state.type].stay ? ` · 주문 ${rounds()}번` : '';
+    return `<span class="grow">가구를 누르면 옮기거나 보관할 수 있어요</span><span>분위기 ${charm()} · 자리 ${seatCount()}개${stay}</span>`;
   }
 
   function renderEdit() {
@@ -531,6 +534,11 @@ export function initUI({ atlas, renderer }) {
   on('serve', () => sfx('serve'));
   on('collect', r => { sfx('done'); toast(`${r.name} ${r.n}${josa(SHOP_TYPES[G.state.type].unit, '을', '를')} 진열했어요`); });
   on('manager', ({ pet, n, coins }) => { sfx('coin'); news(`점장 ${josa(pet.name, '이', '가')} 그동안 ${n}번 팔아서 코인 ${coins}개를 벌어 놨어요`); });
+  // 단골: 열 명마다 받는 감사 선물과 첫 단골만 알린다(한 명마다 알리면 너무 잦다).
+  on('regular', ({ n, gift }) => {
+    if (gift) { sfx('level'); news(`단골이 ${n}명이 됐어요! 감사 선물로 코인 ${gift}개를 받았어요`); }
+    else if (n === 1) news('첫 단골이 생겼어요! 시킨 것을 끝까지 챙겨 주면 단골이 돼요');
+  });
   on('pet', pet => voice(pet.species));
   // 간식: 먼저 먹는 소리가 나고, 다 먹으면(cheer) 그 종의 목소리로 운다.
   on('feed', ({ pet, fav }) => {

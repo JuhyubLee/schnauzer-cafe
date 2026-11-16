@@ -252,6 +252,8 @@ export const PHOTO_MAX_CHARS = 12000;
 // icon: 골목 화면에서 가게를 나타내는 그림, maker: 만드는 기구의 이름과 그림(만드는 중 그림은 이름 뒤에 _on)
 // make: 만드는 일을 부르는 말, unit: 물건을 세는 말
 // stand: 손님이 앉지 않고 옷걸이(rack) 옆에 서서 고르는 가게. 처음에 테이블 대신 옷걸이가 놓인다.
+// stay: 손님이 한 번 먹고 가지 않고 머물며 여러 번 시키는 가게(아래 STAY_ROUNDS).
+// trait: 그 가게만의 재미를 골목 화면에서 알려 주는 글.
 // opens: 여는 조건. after 가게가 lv 레벨이 되면 그 가게의 지갑에서 price를 내고 연다.
 // custom: 나만의 메뉴를 그 가게에서 부르는 말. item: 파는 것을 부르는 말, sample: 이름 예시, tiers: 등급(CUSTOM_TIERS) 이름,
 //   templates: 고를 수 있는 밑그림(sprites.js의 ICON_TEMPLATES). 첫째가 처음에 깔려 있다.
@@ -259,20 +261,30 @@ const FOOD_TIERS = { quick: '간단 메뉴', meal: '든든 메뉴', special: '�
 export const SHOP_TYPES = {
   bunsik: {
     name: '분식', icon: 'f_tteok', make: '요리', unit: '그릇', maker: { name: '화구', sprite: 'stove' },
+    trait: '손님이 자주 와서 빨리 먹고 가요. 넉넉히 만들어 두고 바쁘게 팔아요.',
     custom: { item: '메뉴', sample: '마라탕', tiers: FOOD_TIERS, templates: ['bowl', 'plate', 'cup', 'blank'] },
   },
   cafe: {
-    name: '카페', icon: 'f_latte', make: '요리', unit: '개', maker: { name: '커피 머신', sprite: 'espresso' },
+    name: '카페', icon: 'f_latte', make: '요리', unit: '개', stay: true, maker: { name: '커피 머신', sprite: 'espresso' },
+    trait: '손님이 오래 머물며 여러 번 시켜요. 분위기가 좋을수록 더 시키고, 끝까지 챙겨 주면 단골이 돼요.',
     custom: { item: '메뉴', sample: '딸기 라테', tiers: FOOD_TIERS, templates: ['cup', 'plate', 'bowl', 'blank'] },
     opens: { after: 'bunsik', lv: 12, price: 15000 },
   },
   clothes: {
     name: '옷가게', icon: 'f_tshirt', make: '만들기', unit: '벌', stand: true, maker: { name: '재봉틀', sprite: 'sewing' },
+    trait: '손님이 옷걸이 앞에 서서 고르고, 산 것을 들고 나가요.',
     custom: { item: '옷', sample: '멜빵바지', tiers: { quick: '간단한 옷', meal: '멋진 옷', special: '특별한 옷' }, templates: ['shirt', 'dress', 'blank'] },
     opens: { after: 'cafe', lv: 12, price: 20000 },
   },
 };
 export const FIRST_SHOP = 'bunsik';
+// 머무는 가게(stay)의 손님 한 명이 시키는 횟수: [분위기, 횟수]. 분위기가 그 값 이상이면 그 횟수만큼 시킨다.
+export const STAY_ROUNDS = [[0, 2], [15, 3], [40, 4]];
+export const stayRounds = charm => STAY_ROUNDS.reduce((n, [need, rounds]) => (charm >= need ? rounds : n), 1);
+export const STAY_REST = 8; // 다 먹고 다음 것을 시킬 때까지 쉬는 시간(초)
+// 단골: 시킨 것을 끝까지 다 받고 나간 손님. REGULAR_EVERY명마다 감사 선물(코인)을 받는다.
+export const REGULAR_EVERY = 10;
+export const regularGift = lv => 20 + 10 * lv;
 // 메뉴·가구·바닥·벽지가 딸린 가게
 export const shopOf = item => item.shop || FIRST_SHOP;
 export const SHOP_NAME_MAX = 12;

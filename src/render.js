@@ -285,6 +285,28 @@ export function createRenderer(canvas, atlas) {
     g.fillStyle = color; g.fillRect(x + 1, y + 1, Math.round((w - 2) * Math.max(0, Math.min(1, ratio))), 2);
   }
 
+  // 작은 하트 줄: 머무는 손님이 시킨 횟수(done)를 채운 하트로, 남은 횟수를 빈 하트로 보여 준다. (cx, y)는 줄의 가운데 위.
+  function hearts(cx, y, done, total) {
+    const x0 = Math.round(cx - (total * 6 + 1) / 2);
+    for (let i = 0; i < total; i++) {
+      const x = x0 + i * 6;
+      g.fillStyle = INK;
+      g.fillRect(x + 1, y, 2, 1); g.fillRect(x + 4, y, 2, 1);
+      g.fillRect(x, y + 1, 7, 2); g.fillRect(x + 1, y + 3, 5, 1); g.fillRect(x + 2, y + 4, 3, 1); g.fillRect(x + 3, y + 5, 1, 1);
+      g.fillStyle = i < done ? '#e2432c' : '#fff7ea';
+      g.fillRect(x + 1, y + 1, 2, 1); g.fillRect(x + 4, y + 1, 2, 1);
+      g.fillRect(x + 1, y + 2, 5, 1); g.fillRect(x + 2, y + 3, 3, 1); g.fillRect(x + 3, y + 4, 1, 1);
+    }
+  }
+
+  // 작은 음표: 쉬고 있는 손님 머리 옆에서 떠오른다.
+  function note(x, y, alpha) {
+    g.globalAlpha = alpha;
+    g.fillStyle = INK;
+    g.fillRect(x + 2, y, 3, 1); g.fillRect(x + 2, y + 1, 1, 4); g.fillRect(x, y + 4, 3, 2);
+    g.globalAlpha = 1;
+  }
+
   function drawRoom(s, time) {
     const W = canvas.width, h = canvas.height, shift = wallShift(s);
     // 꾸미기에서 구매 확정을 기다리는 벽지와 바닥은 산 것처럼 미리 보여 준다.
@@ -383,7 +405,7 @@ export function createRenderer(canvas, atlas) {
   }
 
   function drawCustomer(c, time) {
-    const waiting = c.state === 'wait' || c.state === 'eat';
+    const waiting = c.state === 'wait' || c.state === 'eat' || c.state === 'rest';
     const seated = waiting && !c.seat.stand; // 서서 고르는 가게(옷가게)에서는 앉지 않는다
     const frame = seated ? 'sit' : waiting ? 'b' : Math.floor(c.walk * 6) % 2 ? 'a' : 'b';
     const bob = c.state === 'eat' && Math.floor(time * 4) % 2 ? 1 : 0;
@@ -440,8 +462,16 @@ export function createRenderer(canvas, atlas) {
       }
     }
     for (const c of [...w.customers].sort((a, b) => a.y - b.y)) {
-      if (c.state !== 'wait') continue;
       const cx = PAD + c.x * TILE + 8, headTop = WALL_H + (c.y + 1) * TILE - 5 - 17 - bubbleLift(c);
+      // 머무는 가게: 몇 번 시켰는지 하트로 보여 준다(다 차면 단골). 쉬는 동안에는 머리 옆으로 음표가 떠오른다.
+      if (c.rounds > 1 && (c.state === 'wait' || c.state === 'eat' || c.state === 'rest')) {
+        hearts(cx, headTop - (c.state === 'wait' ? 26 : 6), c.state === 'wait' ? c.round - 1 : c.round, c.rounds);
+        if (c.state === 'rest') {
+          const phase = (time * 0.5 + c.id * 0.37) % 1;
+          note(cx + 4, Math.round(headTop + 2 - phase * 7), 1 - phase);
+        }
+      }
+      if (c.state !== 'wait') continue;
       const have = s.stock[c.order] > 0;
       const left = patienceLeft(c);
       const shake = left < 0.25 && Math.floor(time * 10) % 2 ? 1 : 0;
@@ -526,9 +556,10 @@ export function createRenderer(canvas, atlas) {
     }
     if (!G.edit) {
       for (const c of w.customers) {
-        const seated = (c.state === 'wait' || c.state === 'eat') && !c.seat.stand;
+        const seated = (c.state === 'wait' || c.state === 'eat' || c.state === 'rest') && !c.seat.stand;
         list.push({ key: c.y + (seated ? 0.6 : 0.55), draw: () => drawCustomer(c, time) });
-        if (c.state === 'eat' && !c.seat.stand) {
+        // 먹는 동안, 그리고 머무는 가게에서 먹고 쉬는 동안에는 시킨 것이 테이블에 놓여 있다.
+        if ((c.state === 'eat' || c.state === 'rest') && !c.seat.stand) {
           const dx = (c.seat.x - c.seat.tx) * 4, dy = (c.seat.y - c.seat.ty) * 2;
           list.push({
             key: c.seat.ty + 0.7,

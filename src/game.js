@@ -3,7 +3,7 @@ import {
   RECIPE, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FURN_GROUPS, FLOORS, WALLS,
   PETS, PET_SLOTS, PET_NAME_MAX, WEAR, START_ROWS, START_COLS, START_DOOR, EXPANSIONS, WIDENINGS, EXPAND_DIRS,
   STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, TREATS, TREATS_PER_DAY, SHOP_TYPES, FIRST_SHOP, SHOP_RECIPES, SHOP_NAME_MAX,
-  MANAGER_RATE, levelOf, stoveLimit, onSale, bondOf, dayKey, shopOf, furnIn,
+  MANAGER_RATE, STAY_REST, REGULAR_EVERY, levelOf, stoveLimit, onSale, bondOf, dayKey, shopOf, furnIn, stayRounds, regularGift,
 } from './data.js';
 import { CUSTOMER_LOOKS, validIcon } from './sprites.js';
 import { mirror } from './device.js';
@@ -128,7 +128,7 @@ function syncPets() {
 // 아래가 가게마다 따로 있는 값이다. 나머지(친구, 옷장, 도장, 보관함, 설정)는 모든 가게가 같이 쓴다.
 const SHOP_FIELDS = [
   'type', 'shopName', 'coins', 'xp', 'rows', 'cols', 'door', 'items', 'nextId', 'floor', 'wall', 'stock',
-  'custom', 'nextCustom', 'photo', 'stats', 'tut', 'share', 'sid', 'skey',
+  'custom', 'nextCustom', 'photo', 'stats', 'tut', 'share', 'sid', 'skey', 'regulars',
 ];
 const has = Object.hasOwn;
 
@@ -246,7 +246,7 @@ function usableShop(s) {
     && Array.isArray(s.floor) && s.floor.length === s.rows * s.cols && s.floor.every(f => has(FLOORS, f))
     && has(WALLS, s.wall) && (s.photo === null || validPhoto(s.photo)) && typeof s.share === 'boolean'
     && (s.sid === undefined || /^[a-z0-9]{6,24}$/.test(s.sid)) && (s.skey === undefined || /^[a-f0-9]{32}$/.test(s.skey))
-    && obj(s.stock) && obj(s.stats)
+    && obj(s.stock) && obj(s.stats) && (s.regulars === undefined || (int(s.regulars) && s.regulars >= 0))
     && Array.isArray(s.custom) && s.custom.length <= MAX_CUSTOM && s.custom.every(c => obj(c)
       && /^c\d+$/.test(c.id) && typeof c.name === 'string' && has(CUSTOM_TIERS, c.tier) && validIcon(c.px))
     && Array.isArray(s.items) && s.items.every(i => obj(i) && has(FURN, i.type)
@@ -333,9 +333,15 @@ export const charm = () => charmOf(G.state);
 export const stoves = () => G.state.items.filter(i => i.type === 'stove');
 export const cookState = st => (!st.cook ? 'idle' : Date.now() >= st.cook.end ? 'done' : 'cooking');
 const inBounds = (x, y) => x >= 0 && y >= 0 && x < cols() && y < G.state.rows;
-// 손님이 오는 간격(초). 분위기가 좋을수록 짧다.
+// 주문이 들어오는 간격(초). 분위기가 좋을수록 짧다.
 const paceOf = shop => Math.max(3.5, 9 - charmOf(shop) * 0.2);
-const spawnInterval = () => paceOf(G.state);
+// 손님 한 명이 시키는 횟수. 머무는 가게(카페)에서는 분위기가 좋을수록 여러 번 시킨다.
+const roundsOf = shop => (SHOP_TYPES[shop.type].stay ? stayRounds(charmOf(shop)) : 1);
+export const rounds = () => roundsOf(G.state);
+// 단골 수(머무는 가게에서 시킨 것을 끝까지 다 받고 나간 손님). 저장에는 한 명이라도 생긴 뒤에 들어간다.
+export const regulars = () => G.state.regulars || 0;
+// 손님이 오는 간격. 여러 번 시키는 가게에는 그만큼 드물게 와서, 주문이 들어오는 빠르기는 어느 가게나 같다.
+const spawnInterval = () => paceOf(G.state) * rounds();
 
 // 메뉴: 기본 메뉴와 나만의 메뉴를 같은 모양으로 다룬다.
 let customCache = null; // 나만의 메뉴 id → 메뉴. 고칠 때마다 비운다.
@@ -524,6 +530,7 @@ function trySpawn() {
       id: w.nextCid++, look: rand(CUSTOMER_LOOKS), seat, order: pickOrder(),
       x: door, y: -1, path: [{ x: door, y: 0 }, ...path],
       state: 'in', t: 0, dir: 1, up: false, walk: 0, claim: null,
+      round: 1, rounds: rounds(), // 몇 번째 주문인지, 모두 몇 번 시킬지
     });
     greet();
     return;
@@ -564,6 +571,17 @@ function pay(c) {
   addXp(1);
 }
 
+// 단골이 된다: 머무는 가게에서 시킨 것을 끝까지 다 받고 나가는 손님. 열 명마다 감사 선물을 받는다. 구경 중인 가게에서는 세지 않는다.
+function becomeRegular(c) {
+  const w = G.world, s = G.state;
+  for (let i = 0; i < 3; i++) w.floats.push({ kind: 'heart', x: c.x + (i - 1) * 0.45, y: c.y - 0.6 - (i % 2) * 0.3, t: -i * 0.12 });
+  if (G.visit) return;
+  s.regulars = regulars() + 1;
+  const gift = s.regulars % REGULAR_EVERY === 0 ? regularGift(level()) : 0;
+  s.coins += gift;
+  emit('regular', { n: s.regulars, gift });
+}
+
 // byHand: 플레이어가 손님을 직접 눌러서 가져다준 경우(친구가 한 서빙과 구분한다)
 export function serve(c, byHand = false) {
   const s = G.state;
@@ -598,8 +616,15 @@ function updateCustomers(dt) {
       if (c.t > patience()) leave(c);
     } else if (c.state === 'eat') {
       c.t -= dt;
-      // 서서 고르는 가게에서는 산 물건을 들고 나간다(bought).
-      if (c.t <= 0) { pay(c); c.bought = !!c.seat.stand; leave(c); }
+      if (c.t > 0) continue;
+      pay(c);
+      // 머무는 가게에서는 쉬었다가 한 번 더 시킨다. 다 시켰으면 단골이 되어 나간다.
+      if (c.round < c.rounds) { c.state = 'rest'; c.t = STAY_REST; continue; }
+      if (c.rounds > 1) becomeRegular(c);
+      c.bought = !!c.seat.stand; // 서서 고르는 가게에서는 산 물건을 들고 나간다
+      leave(c);
+    } else if (c.state === 'rest') {
+      if ((c.t -= dt) <= 0) Object.assign(c, { round: c.round + 1, order: pickOrder(), state: 'wait', t: 0 });
     } else if (c.state === 'out') {
       if (stepAlong(c, WALK_SPEED, dt)) c.state = 'gone';
     }
@@ -843,8 +868,12 @@ export function saveCustom({ id, name, tier, px }) {
 export function deleteCustom(id) {
   const s = G.state, w = G.world;
   if (stoves().some(st => st.cook?.r === id)) return fail('만드는 중인 것은 지울 수 없어요');
-  // 이 메뉴를 먹던 손님은 계산하고, 기다리던 손님은 다른 메뉴를 고른다.
-  for (const c of w.customers) if (c.order === id && c.state === 'eat') { pay(c); leave(c); }
+  // 이 메뉴를 먹던 손님은 계산하고 나가고, 먹고 쉬던 손님도 나간다. 기다리던 손님은 다른 메뉴를 고른다.
+  for (const c of w.customers) {
+    if (c.order !== id || (c.state !== 'eat' && c.state !== 'rest')) continue;
+    if (c.state === 'eat') pay(c);
+    leave(c);
+  }
   s.custom = s.custom.filter(c => c.id !== id);
   delete s.stock[id];
   customCache = null;
