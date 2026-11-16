@@ -3,9 +3,10 @@ import {
   RECIPE, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FURN_GROUPS, FLOORS, WALLS,
   PETS, PET_SLOTS, PET_NAME_MAX, WEAR, START_ROWS, START_COLS, START_DOOR, EXPANSIONS, WIDENINGS, EXPAND_DIRS,
   STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, TREATS, TREATS_PER_DAY, SHOP_TYPES, FIRST_SHOP, SHOP_RECIPES, SHOP_NAME_MAX,
-  MANAGER_RATE, STAY_REST, REGULAR_EVERY, levelOf, stoveLimit, onSale, bondOf, dayKey, shopOf, furnIn, stayRounds, regularGift,
+  MANAGER_RATE, STAY_REST, REGULAR_EVERY, DISPLAY_PULL, DISPLAY_BONUS, FIT_TIME, POSE_TIME,
+  levelOf, stoveLimit, onSale, bondOf, dayKey, shopOf, furnIn, stayRounds, regularGift,
 } from './data.js';
-import { CUSTOMER_LOOKS, validIcon } from './sprites.js';
+import { CUSTOMER_LOOKS, validIcon, mainColor } from './sprites.js';
 import { mirror } from './device.js';
 import { bump } from './daily.js';
 import { through } from './bytes.js';
@@ -32,6 +33,7 @@ const fail = msg => { emit('toast', msg); return false; };
 const rand = n => Math.floor(Math.random() * n);
 
 // 새 가게 하나의 값(아래 SHOP_FIELDS): 만드는 기구 하나, 화분, 손님 자리(테이블 두 벌이나 옷걸이 둘), 100코인.
+// 진열하는 가게(옷가게)에는 마네킹도 하나 놓는다.
 function freshShop(type, shopName) {
   let id = 1;
   const it = (kind, x, y, extra) => ({ id: id++, type: kind, x, y, ...extra });
@@ -43,6 +45,7 @@ function freshShop(type, shopName) {
       ...(SHOP_TYPES[type].stand
         ? [it('rack', 2, 2), it('rack', 5, 4)]
         : [it('table', 2, 2), it('stool', 1, 2), it('stool', 3, 2), it('table', 5, 4), it('stool', 4, 4), it('stool', 6, 4)]),
+      ...(SHOP_TYPES[type].display ? [it('mannequin', 7, 1)] : []),
     ],
     nextId: id,
     floor: Array(START_ROWS * START_COLS).fill('wood'),
@@ -251,7 +254,8 @@ function usableShop(s) {
       && /^c\d+$/.test(c.id) && typeof c.name === 'string' && has(CUSTOM_TIERS, c.tier) && validIcon(c.px))
     && Array.isArray(s.items) && s.items.every(i => obj(i) && has(FURN, i.type)
       && int(i.x) && int(i.y) && i.x >= 0 && i.x < s.cols && i.y >= 0 && i.y < s.rows
-      && (i.type !== 'stove' || (STOVE_SPEED[i.lv - 1] > 0 && (!i.cook || recipe(i.cook.r)))));
+      && (i.type !== 'stove' || (STOVE_SPEED[i.lv - 1] > 0 && (!i.cook || recipe(i.cook.r))))
+      && (i.show === undefined || (FURN[i.type].show === true && recipe(i.show))));
 }
 
 // 붙여 넣은 백업(저장에 쓰는 모양)이 이 게임이 읽을 수 있는 모양인지 본다. 잘린 코드나 엉뚱한 글을 걸러 낸다.
@@ -346,13 +350,34 @@ const spawnInterval = () => paceOf(G.state) * rounds();
 // 메뉴: 기본 메뉴와 나만의 메뉴를 같은 모양으로 다룬다.
 let customCache = null; // 나만의 메뉴 id → 메뉴. 고칠 때마다 비운다.
 function customRecipes() {
-  customCache ||= new Map(G.state.custom.map(c =>
-    [c.id, { ...CUSTOM_TIERS[c.tier], id: c.id, name: c.name, icon: `custom_${c.id}`, custom: true }]));
+  // 진열하는 가게(옷가게)에서 직접 그린 것은 입을 수 있는 옷이다. 그림에 가장 많이 쓴 색이 윗옷 색이 된다.
+  const wearable = SHOP_TYPES[G.state.type].display;
+  customCache ||= new Map(G.state.custom.map(c => {
+    const color = wearable && mainColor(c.px);
+    return [c.id, { ...CUSTOM_TIERS[c.tier], id: c.id, name: c.name, icon: `custom_${c.id}`, custom: true, ...(wearable && { worn: { top: [color, color] } }) }];
+  }));
   return customCache;
 }
 export const recipeOf = id => RECIPE[id] || customRecipes().get(id);
 export const allRecipes = () => [...SHOP_RECIPES[G.state.type], ...customRecipes().values()];
 const inStock = () => allRecipes().filter(r => G.state.stock[r.id] > 0);
+
+// 진열: 진열하는 가게(옷가게)에서 마네킹(show인 가구)에 걸어 둔 것(item.show)은 손님이 더 자주 찾고 값을 더 받는다.
+export const displayed = id => !!SHOP_TYPES[G.state.type].display && G.state.items.some(i => i.show === id);
+export const priceOf = r => (displayed(r.id) ? Math.round(r.price * DISPLAY_BONUS) : r.price);
+// 마네킹에 하나를 걸거나(recipeId) 내린다(null). 바꿨으면 true.
+export function setShow(itemId, recipeId) {
+  const it = itemById(itemId);
+  if (G.visit || !it || !FURN[it.type].show || !SHOP_TYPES[G.state.type].display) return false;
+  if (recipeId == null) delete it.show;
+  else {
+    const r = recipeOf(recipeId);
+    if (!r || (!r.custom && shopOf(r) !== G.state.type) || r.lv > level()) return fail('아직 걸 수 없어요');
+    it.show = recipeId;
+  }
+  emit('show');
+  return true;
+}
 
 // 돈도 재고도 없고 불 위에 올린 것도 없으면, 그 가게의 가장 싼 메뉴는 공짜로 만들 수 있다. (막히지 않게)
 const CHEAPEST = Object.fromEntries(Object.entries(SHOP_RECIPES).map(([type, list]) => [type, list.reduce((a, b) => (b.cost < a.cost ? b : a))]));
@@ -512,6 +537,9 @@ function addXp(n) {
 
 function pickOrder() {
   const open = allRecipes().filter(r => r.lv <= level());
+  // 진열해 둔 것이 있으면 절반은 그 가운데서 고른다.
+  const shown = open.filter(r => displayed(r.id));
+  if (shown.length && Math.random() < DISPLAY_PULL) return shown[rand(shown.length)].id;
   const have = inStock();
   const pool = have.length && Math.random() < 0.8 ? have : open;
   return pool[rand(pool.length)].id;
@@ -519,7 +547,8 @@ function pickOrder() {
 
 function trySpawn() {
   const w = G.world, door = G.state.door;
-  const taken = new Set(w.customers.map(c => c.seat.id));
+  // 입어 보러 간 손님(tried)은 옷걸이 앞을 비운 것이다.
+  const taken = new Set(w.customers.filter(c => !c.tried).map(c => c.seat.id));
   const free = seats().filter(s => !taken.has(s.id));
   const grid = blockGrid();
   while (free.length) {
@@ -551,24 +580,43 @@ function greet() {
 
 function leave(c) {
   const door = G.state.door;
-  const path = findPath(c.seat.x, c.seat.y, (x, y) => x === door && y === 0);
+  const path = findPath(Math.round(c.x), Math.round(c.y), (x, y) => x === door && y === 0);
   if (!path) { c.state = 'gone'; return; }
   c.path = [...path, { x: door, y: -1 }];
   c.state = 'out';
 }
 
+// 받았지만 아직 값을 안 낸 손님(먹는 중, 입어 보러 가는 중, 입어 보는 중)
+const served = c => c.state === 'eat' || c.state === 'try' || c.state === 'fit';
+
+// 값을 받는다. 진열해 둔 것은 더 받고, 입어 보고 사는 손님(worn)은 꼭 팁을 준다.
 function pay(c) {
-  const s = G.state, r = recipeOf(c.order);
-  const tip = Math.random() < Math.min(0.6, charm() * 0.03) ? Math.max(1, Math.round(r.price * 0.25)) : 0;
-  s.coins += r.price + tip;
+  const s = G.state, price = priceOf(recipeOf(c.order));
+  const tip = c.worn || Math.random() < Math.min(0.6, charm() * 0.03) ? Math.max(1, Math.round(price * 0.25)) : 0;
+  s.coins += price + tip;
   s.stats.sold++;
   bump('sell', 1);
-  bump('earn', r.price + tip);
+  bump('earn', price + tip);
   // 서빙 안내는 세 그릇 팔 때까지 보여 준다. (친구가 먼저 서빙해도 읽을 시간이 있게)
   if (s.tut === 2 && s.stats.sold >= 3) s.tut = 3;
-  G.world.floats.push({ kind: 'coin', n: r.price + tip, x: c.x, y: c.y, t: 0 });
+  G.world.floats.push({ kind: 'coin', n: price + tip, x: c.x, y: c.y, t: 0 });
   emit('sale');
   addXp(1);
+}
+
+// 입을 수 있는 옷을 받은 손님은 빈 탈의실(fit인 가구)이 있으면 값을 내기 전에 그 앞(아래) 칸으로 가서 입어 본다. 갔으면 true.
+function goTry(c) {
+  if (!recipeOf(c.order).worn) return false;
+  const grid = blockGrid(), busy = new Set(G.world.customers.map(o => o.room));
+  for (const room of G.state.items) {
+    const fx = room.x, fy = room.y + 1;
+    if (!FURN[room.type].fit || busy.has(room.id) || !inBounds(fx, fy) || grid[fy * cols() + fx]) continue;
+    const path = findPath(Math.round(c.x), Math.round(c.y), (x, y) => x === fx && y === fy, grid);
+    if (!path) continue;
+    Object.assign(c, { state: 'try', path, room: room.id, tried: true });
+    return true;
+  }
+  return false;
 }
 
 // 단골이 된다: 머무는 가게에서 시킨 것을 끝까지 다 받고 나가는 손님. 열 명마다 감사 선물을 받는다. 구경 중인 가게에서는 세지 않는다.
@@ -616,7 +664,7 @@ function updateCustomers(dt) {
       if (c.t > patience()) leave(c);
     } else if (c.state === 'eat') {
       c.t -= dt;
-      if (c.t > 0) continue;
+      if (c.t > 0 || goTry(c)) continue;
       pay(c);
       // 머무는 가게에서는 쉬었다가 한 번 더 시킨다. 다 시켰으면 단골이 되어 나간다.
       if (c.round < c.rounds) { c.state = 'rest'; c.t = STAY_REST; continue; }
@@ -625,6 +673,18 @@ function updateCustomers(dt) {
       leave(c);
     } else if (c.state === 'rest') {
       if ((c.t -= dt) <= 0) Object.assign(c, { round: c.round + 1, order: pickOrder(), state: 'wait', t: 0 });
+    } else if (c.state === 'try') {
+      if (stepAlong(c, WALK_SPEED, dt)) Object.assign(c, { state: 'fit', t: FIT_TIME });
+    } else if (c.state === 'fit') {
+      if ((c.t -= dt) > 0) continue;
+      // 산 옷을 입고 나와서 값을 내고, 잠깐 새 옷을 뽐낸 뒤(pose) 입은 채로 나간다.
+      Object.assign(c, { worn: recipeOf(c.order).worn, state: 'pose', t: POSE_TIME, up: false });
+      w.floats.push({ kind: 'spark', x: c.x, y: c.y - 0.5, t: 0 });
+      pay(c);
+    } else if (c.state === 'pose') {
+      if ((c.t -= dt) > 0) continue;
+      c.room = null;
+      leave(c);
     } else if (c.state === 'out') {
       if (stepAlong(c, WALK_SPEED, dt)) c.state = 'gone';
     }
@@ -868,12 +928,14 @@ export function saveCustom({ id, name, tier, px }) {
 export function deleteCustom(id) {
   const s = G.state, w = G.world;
   if (stoves().some(st => st.cook?.r === id)) return fail('만드는 중인 것은 지울 수 없어요');
-  // 이 메뉴를 먹던 손님은 계산하고 나가고, 먹고 쉬던 손님도 나간다. 기다리던 손님은 다른 메뉴를 고른다.
+  // 이 메뉴를 받은 손님은 계산하고 나가고, 먹고 쉬던 손님도 나간다. 기다리던 손님은 다른 메뉴를 고른다.
   for (const c of w.customers) {
-    if (c.order !== id || (c.state !== 'eat' && c.state !== 'rest')) continue;
-    if (c.state === 'eat') pay(c);
+    if (c.order !== id || !(served(c) || c.state === 'rest')) continue;
+    if (served(c)) pay(c);
+    c.room = null;
     leave(c);
   }
+  for (const it of s.items) if (it.show === id) delete it.show;
   s.custom = s.custom.filter(c => c.id !== id);
   delete s.stock[id];
   customCache = null;
@@ -890,10 +952,10 @@ export function enterEdit() {
   if (G.state.tut === 3) G.state.tut = 4;
 }
 
-// 손님을 모두 내보낸다. 먹던 손님은 계산하고 나간다.
+// 손님을 모두 내보낸다. 받은 손님은 계산하고 나간다.
 function sendOff() {
   const w = G.world;
-  for (const c of w.customers) if (c.state === 'eat') pay(c);
+  for (const c of w.customers) if (served(c)) pay(c);
   w.customers = [];
 }
 

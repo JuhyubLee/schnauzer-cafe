@@ -4,11 +4,11 @@ import {
   G, on, level, hint, charm, seatCount, stoves, cookState, itemById, recipeOf, allRecipes, josa,
   startCook, collect, costOf, enterEdit, exitEdit, storeItem, upgradeCost, expandCfg,
   askWall, askExpand, askUpgrade, pendingInfo, confirmPending, save, reset, startGame, exportSave, importSave,
-  furnOf, levelIn, shopNo, rounds, regulars,
+  furnOf, levelIn, shopNo, rounds, regulars, setShow, displayed, priceOf,
 } from './game.js';
 import {
   FURN, FURN_GROUPS, FLOORS, WALLS, SEASONS, EXPAND_DIRS, LEVEL_XP, PETS, BONDS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL,
-  SONG_CHOICES, SHOP_TYPES, REGULAR_EVERY, stoveLimit, fmtTime, onSale, shopOf,
+  SONG_CHOICES, SHOP_TYPES, REGULAR_EVERY, DISPLAY_BONUS, stoveLimit, fmtTime, onSale, shopOf,
 } from './data.js';
 import { $, esc, setText, setHTML, setSrc, copyText } from './dom.js';
 import { share } from './device.js';
@@ -106,7 +106,8 @@ export function initUI({ atlas, renderer }) {
     const lv = level(), s = G.state, { make, unit } = SHOP_TYPES[s.type]; // 요리·그릇, 만들기·벌처럼 가게마다 다른 말
     const rows = allRecipes().map(r => {
       const locked = r.lv > lv;
-      const info = locked ? `레벨 ${r.lv}에 열려요` : `${fmtTime(r.time)} · ${r.n}${unit} · ${unit}당 ${r.price}`;
+      // 진열해 둔 것(옷가게의 마네킹)은 값을 더 받는다.
+      const info = locked ? `레벨 ${r.lv}에 열려요` : `${fmtTime(r.time)} · ${r.n}${unit} · ${unit}당 ${priceOf(r)}${displayed(r.id) ? ' · 진열 중' : ''}`;
       const row = `<button type="button" class="row" data-act="cook" data-r="${r.id}" ${locked ? 'disabled' : ''}>
         <img class="px" src="${icon(r.icon)}" alt="">
         <span class="meta"><b>${esc(r.name)}</b><small>${info}</small></span>
@@ -150,6 +151,35 @@ export function initUI({ atlas, renderer }) {
         collect(el) { collect(Number(el.dataset.id)); },
         create() { sfx('tap'); menuUI.openEditor(null, () => openCook(stoveId)); },
         edit(el) { sfx('tap'); menuUI.openEditor(el.dataset.r, () => openCook(stoveId)); },
+      },
+    });
+  }
+
+  // ── 진열: 마네킹을 누르면 입힐 것을 고른다 ──
+  function openDisplay(itemId) {
+    const it = itemById(itemId), s = G.state, { unit, custom } = SHOP_TYPES[s.type];
+    const name = furnOf(it.type).name, lv = level();
+    const rows = allRecipes().filter(r => r.lv <= lv).map(r => {
+      const mark = it.show === r.id ? '입히는 중' : displayed(r.id) ? '다른 곳에 진열 중' : '';
+      return `<button type="button" class="row" data-act="show" data-r="${r.id}">
+        <img class="px" src="${icon(r.icon)}" alt="">
+        <span class="meta"><b>${esc(r.name)}</b><small>${unit}당 ${r.price} → ${Math.round(r.price * DISPLAY_BONUS)} · 재고 ${s.stock[r.id] || 0}</small></span>
+        <span class="right"><small>${mark}</small></span>
+      </button>`;
+    }).join('');
+    openSheet(`${name}에 입힐 ${custom.item}`, `
+      <p class="muted">${name}에 입혀 둔 ${josa(custom.item, '은', '는')} 손님이 더 자주 찾고, 값을 ${Math.round((DISPLAY_BONUS - 1) * 100)}% 더 받아요. 넉넉히 만들어 둔 것을 입혀 두면 좋아요.</p>
+      ${rows}
+      ${it.show ? '<button type="button" class="btn" data-act="clear">벗겨 두기</button>' : ''}`, {
+      actions: {
+        show(el) {
+          if (!setShow(itemId, el.dataset.r)) return;
+          save();
+          sfx('tap');
+          closeSheet();
+          toast(`${name}에 ${josa(recipeOf(el.dataset.r).name, '을', '를')} 입혔어요`);
+        },
+        clear() { if (setShow(itemId, null)) { save(); sfx('tap'); closeSheet(); } },
       },
     });
   }
@@ -561,7 +591,7 @@ export function initUI({ atlas, renderer }) {
 
   refresh();
   return {
-    refresh, renderEdit, openCook, toast, back, openAlley: alleyUI.open,
+    refresh, renderEdit, openCook, openDisplay, toast, back, openAlley: alleyUI.open,
     handleInvite: visitUI.handleInvite, syncShop: visitUI.syncShop, openPhoto: photoUI.open,
   };
 }

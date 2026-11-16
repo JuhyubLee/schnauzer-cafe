@@ -1984,3 +1984,33 @@ export function buildAtlas() {
 export function setSprite(atlas, name, rows) {
   put(atlas, name, paint(withOutline(rows), null, name));
 }
+
+// 산 옷을 입은 손님 그림을 atlas에 만들어 두고 그 이름을 돌려준다. base는 손님 그림 이름(cust3_a 같은 것).
+// worn(data.js의 메뉴에 적는다): top 윗옷 [밝은 색, 어두운 색], bottom 바지 색, skirt 치마 색(다리가 보인다), cap 모자 [색, 챙 색]
+const HIP_ROW = HEAD_SHORT.length; // 다리 그림의 첫 줄(허리)
+export function wornSprite(atlas, base, worn) {
+  const name = `${base}|${JSON.stringify(worn)}`;
+  if (!atlas[name]) {
+    const src = RAW[base];
+    const rows = src.rows.map((r, y) => {
+      if (worn.cap && y >= 1 && y <= 3) return r.replace(/h/g, y === 3 ? '2' : '1');
+      if (worn.skirt && y >= HIP_ROW) return r.replace(/j/g, y === HIP_ROW ? '3' : 's');
+      return r;
+    });
+    const pal = { ...src.pal };
+    if (worn.top) [pal.v, pal.V] = worn.top;
+    if (worn.bottom) pal.j = worn.bottom;
+    if (worn.cap) [pal[1], pal[2]] = worn.cap;
+    if (worn.skirt) pal[3] = worn.skirt;
+    put(atlas, name, paint(withOutline(rows), pal, name));
+  }
+  return name;
+}
+
+// 직접 그린 아이콘에서 가장 많이 쓴 색(#rrggbb). 직접 그린 옷을 입은 손님의 윗옷 색으로 쓴다.
+export function mainColor(rows) {
+  const count = {};
+  for (const ch of rows.join('')) if (ch !== EMPTY) count[ch] = (count[ch] || 0) + 1;
+  const top = Object.keys(count).reduce((a, b) => (count[b] > count[a] ? b : a));
+  return PAL[top];
+}

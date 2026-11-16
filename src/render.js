@@ -1,6 +1,7 @@
 // 캔버스 그리기. 논리 해상도(1칸 = 16px)로 그리고, 확대는 CSS가 한다.
 import { G, MAX_COLS, TREAT_TIME, cookState, patienceLeft, recipeOf, petById, furnOf } from './game.js';
-import { FURN, FLOORS, WALLS, PETS, PHOTO_W, PHOTO_H, START_DOOR } from './data.js';
+import { FURN, FLOORS, WALLS, PETS, PHOTO_W, PHOTO_H, START_DOOR, SHOP_TYPES } from './data.js';
+import { wornSprite } from './sprites.js';
 import { skyAt, skyCSS, drawView } from './sky.js';
 
 export const TILE = 16;
@@ -386,6 +387,15 @@ export function createRenderer(canvas, atlas) {
     const f = furnOf(it.type);
     if (it.type !== 'stove') {
       sprOnTile(f.blink && Math.floor(time * 1.5) % 2 ? f.blink : f.sprite, it.x, it.y);
+      const x = PAD + it.x * TILE, bottom = WALL_H + (it.y + 1) * TILE;
+      // 마네킹에 걸어 둔 옷은 몸통 위에 겹쳐 그린다.
+      const shown = it.show && recipeOf(it.show);
+      if (shown) g.drawImage(atlas[shown.icon], x, bottom - TILE);
+      // 탈의실에 손님이 들어가 있으면 커튼 아래로 신발이 보인다.
+      if (f.fit && G.world.customers.some(c => c.state === 'fit' && c.room === it.id)) {
+        g.fillStyle = '#1e1616';
+        g.fillRect(x + 4, bottom - 3, 3, 2); g.fillRect(x + 9, bottom - 3, 3, 2);
+      }
       return;
     }
     const state = cookState(it);
@@ -405,13 +415,18 @@ export function createRenderer(canvas, atlas) {
   }
 
   function drawCustomer(c, time) {
+    if (c.state === 'fit') return; // 탈의실 안에 있다
     const waiting = c.state === 'wait' || c.state === 'eat' || c.state === 'rest';
     const seated = waiting && !c.seat.stand; // 서서 고르는 가게(옷가게)에서는 앉지 않는다
-    const frame = seated ? 'sit' : waiting ? 'b' : Math.floor(c.walk * 6) % 2 ? 'a' : 'b';
+    // 새 옷을 입고 나와 뽐내는 동안(pose)에는 앞을 보고 서서 살짝 뛴다.
+    const posing = c.state === 'pose';
+    const frame = seated ? 'sit' : waiting || posing ? 'b' : Math.floor(c.walk * 6) % 2 ? 'a' : 'b';
     const bob = c.state === 'eat' && Math.floor(time * 4) % 2 ? 1 : 0;
-    sprOnTile(`cust${c.look}_${c.up ? 'back_' : ''}${frame}`, c.x, c.y, seated ? -5 + bob : 0);
-    // 서서 고르는 가게: 받은 것을 몸에 대 보고(eat), 산 것을 들고 나간다(bought)
-    if ((c.state === 'eat' && c.seat.stand) || (c.state === 'out' && c.bought)) {
+    const base = `cust${c.look}_${c.up ? 'back_' : ''}${frame}`;
+    // 입어 보고 산 손님은 그 옷을 입은 모습으로 나간다.
+    sprOnTile(c.worn ? wornSprite(atlas, base, c.worn) : base, c.x, c.y, seated ? -5 + bob : posing && Math.floor(time * 6) % 2 ? -1 : 0);
+    // 서서 고르는 가게: 받은 것을 몸에 대 보고(eat), 탈의실로 들고 가고(try), 입지 않는 것은 들고 나간다(bought)
+    if ((c.state === 'eat' && c.seat.stand) || c.state === 'try' || (c.state === 'out' && c.bought)) {
       const x = PAD + c.x * TILE + (c.dir > 0 ? 8 : -1), y = WALL_H + c.y * TILE + 4 - bob;
       g.drawImage(miniOf(atlas[recipeOf(c.order).icon]), Math.round(x), Math.round(y));
     }
@@ -461,6 +476,12 @@ export function createRenderer(canvas, atlas) {
         bar(px + 1, top - 2, 14, (Date.now() - it.cook.start) / (it.cook.end - it.cook.start), '#f58a1f');
       }
     }
+    // 진열하는 가게: 비어 있는 마네킹 위에 흐린 옷 말풍선을 띄워, 눌러서 옷을 입힐 수 있음을 알린다.
+    if (!G.edit && !G.visit && SHOP_TYPES[s.type].display) {
+      for (const it of s.items) {
+        if (FURN[it.type].show && !it.show) bubble(PAD + it.x * TILE + 8, WALL_H + it.y * TILE + 3 + (Math.floor(time * 2) % 2), SHOP_TYPES[s.type].icon, 0.4);
+      }
+    }
     for (const c of [...w.customers].sort((a, b) => a.y - b.y)) {
       const cx = PAD + c.x * TILE + 8, headTop = WALL_H + (c.y + 1) * TILE - 5 - 17 - bubbleLift(c);
       // 머무는 가게: 몇 번 시켰는지 하트로 보여 준다(다 차면 단골). 쉬는 동안에는 머리 옆으로 음표가 떠오른다.
@@ -491,6 +512,13 @@ export function createRenderer(canvas, atlas) {
         const text = '+' + f.n, tw = numWidth(text);
         spr('coin', px - (tw + 10) / 2, py);
         num(text, Math.round(px - (tw + 10) / 2 + 10), Math.round(py + 2), '#ffd34d');
+      } else if (f.kind === 'spark') {
+        // 반짝임: 새 옷을 입고 나올 때
+        g.fillStyle = '#ffd34d';
+        for (const [dx, dy] of [[-7, 0], [6, -3], [0, -8]]) {
+          g.fillRect(Math.round(px) + dx - 1, Math.round(py) + dy, 3, 1);
+          g.fillRect(Math.round(px) + dx, Math.round(py) + dy - 1, 1, 3);
+        }
       } else {
         const text = 'x' + f.n;
         g.drawImage(atlas[f.icon], Math.round(px - 12), Math.round(py - 6));

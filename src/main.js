@@ -3,7 +3,7 @@ import {
   G, load, save, saveText, tick, on, serve, petPet, collect, cookState, stoves, recipeOf,
   askPlace, moveItem, askPaint,
 } from './game.js';
-import { fmtTime } from './data.js';
+import { FURN, SHOP_TYPES, fmtTime } from './data.js';
 import { buildAtlas, setSprite } from './sprites.js';
 import { createRenderer, viewW, viewH, tileAt, TILE, PAD, WALL_H, photoRect, doorRect, bubbleLift } from './render.js';
 import { initUI } from './ui.js';
@@ -86,6 +86,12 @@ function playTap(p) {
   // 문: 누르면 골목으로 나가 다른 가게로 가거나 새 가게를 연다
   const door = doorRect(G.state);
   if (inRect(p, door.x - 2, door.y - 2, door.w + 4, door.h + 2)) { sfx('tap'); ui.openAlley(); return; }
+  // 진열하는 가게의 마네킹: 누르면 입힐 것을 고른다. 비어 있을 때 떠 있는 말풍선까지 받는다.
+  if (SHOP_TYPES[G.state.type].display) {
+    const stand = G.state.items.find(i => FURN[i.type].show
+      && inRect(p, PAD + i.x * TILE, WALL_H + i.y * TILE - (i.show ? 0 : 18), TILE, TILE + (i.show ? 0 : 18)));
+    if (stand) { sfx('tap'); ui.openDisplay(stand.id); return; }
+  }
   const it = renderer.pickItem(p.x, p.y);
   if (it?.type !== 'stove') return;
   if (cookState(it) === 'idle') { sfx('tap'); ui.openCook(it.id); }

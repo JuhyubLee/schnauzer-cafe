@@ -25,16 +25,18 @@ export const RECIPES = [
   { id: 'cheesecake', name: '치즈 케이크', icon: 'f_cheesecake', lv: 6, cost: 220, time: 1800, n: 12, price: 42, xp: 70, shop: 'cafe' },
   { id: 'tiramisu', name: '티라미수', icon: 'f_tiramisu', lv: 7, cost: 300, time: 3600, n: 14, price: 50, xp: 110, shop: 'cafe' },
   { id: 'shortcake', name: '딸기 생크림 케이크', icon: 'f_shortcake', lv: 8, cost: 420, time: 10800, n: 16, price: 64, xp: 200, shop: 'cafe' },
+  // worn: 입을 수 있는 옷이면, 산 손님의 모습을 어떻게 바꾸는지(sprites.js의 wornSprite). 없으면 손에 들고 나간다.
+  //   top: 윗옷 [밝은 색, 어두운 색], bottom: 바지 색, skirt: 치마 색(다리가 보인다), cap: 모자 [색, 챙 색]
   { id: 'socks', name: '양말', icon: 'f_socks', lv: 1, cost: 8, time: 15, n: 4, price: 5, xp: 3, shop: 'clothes' },
   { id: 'hanky', name: '손수건', icon: 'f_hanky', lv: 1, cost: 20, time: 40, n: 5, price: 9, xp: 5, shop: 'clothes' },
-  { id: 'tshirt', name: '티셔츠', icon: 'f_tshirt', lv: 2, cost: 55, time: 120, n: 8, price: 15, xp: 12, shop: 'clothes' },
-  { id: 'cap', name: '야구 모자', icon: 'f_cap', lv: 2, cost: 12, time: 30, n: 6, price: 5, xp: 4, shop: 'clothes' },
+  { id: 'tshirt', name: '티셔츠', icon: 'f_tshirt', lv: 2, cost: 55, time: 120, n: 8, price: 15, xp: 12, shop: 'clothes', worn: { top: ['#f58a1f', '#cf6410'] } },
+  { id: 'cap', name: '야구 모자', icon: 'f_cap', lv: 2, cost: 12, time: 30, n: 6, price: 5, xp: 4, shop: 'clothes', worn: { cap: ['#e2432c', '#a82a1c'] } },
   { id: 'totebag', name: '에코백', icon: 'f_totebag', lv: 3, cost: 90, time: 300, n: 8, price: 24, xp: 22, shop: 'clothes' },
-  { id: 'vest', name: '니트 조끼', icon: 'f_vest', lv: 4, cost: 70, time: 480, n: 6, price: 28, xp: 26, shop: 'clothes' },
-  { id: 'jeans', name: '청바지', icon: 'f_jeans', lv: 5, cost: 160, time: 900, n: 10, price: 36, xp: 45, shop: 'clothes' },
-  { id: 'dress', name: '원피스', icon: 'f_dress', lv: 6, cost: 220, time: 1800, n: 12, price: 42, xp: 70, shop: 'clothes' },
-  { id: 'coat', name: '코트', icon: 'f_coat', lv: 7, cost: 300, time: 3600, n: 14, price: 50, xp: 110, shop: 'clothes' },
-  { id: 'hanbok', name: '한복', icon: 'f_hanbok', lv: 8, cost: 420, time: 10800, n: 16, price: 64, xp: 200, shop: 'clothes' },
+  { id: 'vest', name: '니트 조끼', icon: 'f_vest', lv: 4, cost: 70, time: 480, n: 6, price: 28, xp: 26, shop: 'clothes', worn: { top: ['#66ad5c', '#3f7a45'] } },
+  { id: 'jeans', name: '청바지', icon: 'f_jeans', lv: 5, cost: 160, time: 900, n: 10, price: 36, xp: 45, shop: 'clothes', worn: { bottom: '#5b9bd8' } },
+  { id: 'dress', name: '원피스', icon: 'f_dress', lv: 6, cost: 220, time: 1800, n: 12, price: 42, xp: 70, shop: 'clothes', worn: { top: ['#f7a8a0', '#e07a78'], skirt: '#f7a8a0' } },
+  { id: 'coat', name: '코트', icon: 'f_coat', lv: 7, cost: 300, time: 3600, n: 14, price: 50, xp: 110, shop: 'clothes', worn: { top: ['#9a6842', '#6b4329'] } },
+  { id: 'hanbok', name: '한복', icon: 'f_hanbok', lv: 8, cost: 420, time: 10800, n: 16, price: 64, xp: 200, shop: 'clothes', worn: { top: ['#ffd34d', '#e0a520'], bottom: '#e2432c' } },
 ];
 export const RECIPE = Object.fromEntries(RECIPES.map(r => [r.id, r]));
 
@@ -112,8 +114,9 @@ export const FURN = {
   rack: { name: '옷걸이', sprite: 'rack', group: 'seat', price: 60, lv: 1, block: true, rack: true, shop: 'clothes' },
   rack_gold: { name: '금빛 옷걸이', sprite: 'rack_gold', group: 'seat', price: 200, lv: 5, block: true, rack: true, charm: 2, shop: 'clothes' },
   mirror: { name: '전신 거울', sprite: 'mirror', group: 'deco', price: 150, lv: 2, block: true, charm: 3, shop: 'clothes' },
-  mannequin: { name: '마네킹', sprite: 'mannequin', group: 'deco', price: 300, lv: 3, block: true, charm: 5, shop: 'clothes' },
-  fitting: { name: '탈의실', sprite: 'fitting', group: 'deco', price: 800, lv: 4, block: true, charm: 8, shop: 'clothes' },
+  // show: 파는 것 하나를 걸어 둘 수 있는 가구(걸어 둔 것은 저장의 item.show). fit: 손님이 들어가 옷을 입어 보는 가구
+  mannequin: { name: '마네킹', sprite: 'mannequin', group: 'deco', price: 300, lv: 1, block: true, charm: 5, show: true, shop: 'clothes' },
+  fitting: { name: '탈의실', sprite: 'fitting', group: 'deco', price: 500, lv: 2, block: true, charm: 8, fit: true, shop: 'clothes' },
 };
 
 // 동물 친구. id는 sprites.js의 PET_PAL과 같아야 한다.
@@ -271,8 +274,8 @@ export const SHOP_TYPES = {
     opens: { after: 'bunsik', lv: 12, price: 15000 },
   },
   clothes: {
-    name: '옷가게', icon: 'f_tshirt', make: '만들기', unit: '벌', stand: true, maker: { name: '재봉틀', sprite: 'sewing' },
-    trait: '손님이 옷걸이 앞에 서서 고르고, 산 것을 들고 나가요.',
+    name: '옷가게', icon: 'f_tshirt', make: '만들기', unit: '벌', stand: true, display: true, maker: { name: '재봉틀', sprite: 'sewing' },
+    trait: '마네킹에 입혀 둔 옷을 손님이 더 찾고 값도 더 받아요. 손님은 탈의실에서 입어 보고, 입은 채로 나가요.',
     custom: { item: '옷', sample: '멜빵바지', tiers: { quick: '간단한 옷', meal: '멋진 옷', special: '특별한 옷' }, templates: ['shirt', 'dress', 'blank'] },
     opens: { after: 'cafe', lv: 12, price: 20000 },
   },
@@ -285,6 +288,11 @@ export const STAY_REST = 8; // 다 먹고 다음 것을 시킬 때까지 쉬는 
 // 단골: 시킨 것을 끝까지 다 받고 나간 손님. REGULAR_EVERY명마다 감사 선물(코인)을 받는다.
 export const REGULAR_EVERY = 10;
 export const regularGift = lv => 20 + 10 * lv;
+// 진열하는 가게(display): 마네킹(show인 가구)에 걸어 둔 것은 손님이 더 자주 찾고(DISPLAY_PULL의 확률로 그 가운데서 고른다) 값을 더 받는다.
+export const DISPLAY_PULL = 0.5;
+export const DISPLAY_BONUS = 1.15;
+export const FIT_TIME = 3; // 탈의실 안에서 입어 보는 시간(초). 입어 보고 산 손님은 꼭 팁을 준다.
+export const POSE_TIME = 1.5; // 새 옷을 입고 나와 탈의실 앞에서 뽐내는 시간(초)
 // 메뉴·가구·바닥·벽지가 딸린 가게
 export const shopOf = item => item.shop || FIRST_SHOP;
 export const SHOP_NAME_MAX = 12;
