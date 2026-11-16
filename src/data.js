@@ -81,15 +81,15 @@ export const FURN = {
 
 // 동물 친구. id는 sprites.js의 PET_PAL과 같아야 한다.
 // hatDy: 머리 높이가 달라서 모자를 몇 줄 내려(+) 또는 올려(-) 씌울지. nick: 이름을 안 지었을 때 쓰는 이름
-// fav: 좋아하는 간식(TREATS의 이름). 주면 친밀도가 두 배로 오른다.
+// fav: 좋아하는 간식(TREATS의 이름). 주면 친밀도가 두 배로 오른다. cat: 고양이(꼬리를 느긋하게 흔든다)
 export const PETS = {
   schnauzer: { name: '슈나우저', hatDy: 0, nick: '슈슈', fav: 'jerky' },
   maltese: { name: '말티즈', hatDy: 0, nick: '몽이', fav: 'cake' },
   shiba: { name: '시바견', hatDy: 1, nick: '콩이', fav: 'biscuit' },
   poodle: { name: '푸들', hatDy: -1, nick: '초코', fav: 'cake' },
-  cheese: { name: '치즈 고양이', hatDy: 1, nick: '치즈', fav: 'jerky' },
-  tuxedo: { name: '턱시도 고양이', hatDy: 1, nick: '턱시', fav: 'biscuit' },
-  graycat: { name: '회색 고양이', hatDy: 1, nick: '구름', fav: 'cake' },
+  cheese: { name: '치즈 고양이', hatDy: 1, nick: '치즈', fav: 'jerky', cat: true },
+  tuxedo: { name: '턱시도 고양이', hatDy: 1, nick: '턱시', fav: 'biscuit', cat: true },
+  graycat: { name: '회색 고양이', hatDy: 1, nick: '구름', fav: 'cake', cat: true },
 };
 // n번째 친구를 데려오는 조건 (첫 친구는 가게를 열 때 고른다)
 export const PET_SLOTS = [{ lv: 1, price: 0 }, { lv: 4, price: 600 }, { lv: 8, price: 2500 }];

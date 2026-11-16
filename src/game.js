@@ -99,6 +99,7 @@ function syncPets() {
       id: pet.id, x: pos.x, y: pos.y, path: [], state: 'idle', t: 1.5 + i * 0.7,
       dir: 1, up: false, walk: 0, boost: 0, target: null, think: i * 0.15, petCd: 0,
       gift: 0, giftT: 90 + Math.random() * 120, // 물어 온 선물(코인 수)과 다음 선물까지 남은 시간(초)
+      joy: 0, wag: 0, spin: 0, eat: null, // 기쁜 얼굴·꼬리 흔들기·제자리 돌기가 남은 시간(초), 먹고 있는 간식 { icon, t, fav }
     };
   });
 }
@@ -396,7 +397,20 @@ function trySpawn() {
       x: door, y: -1, path: [{ x: door, y: 0 }, ...path],
       state: 'in', t: 0, dir: 1, up: false, walk: 0, claim: null,
     });
+    greet();
     return;
+  }
+}
+
+// '친구' 단계부터는 들어오는 손님을 반긴다: 꼬리를 흔들고, 가만히 있었다면 문 쪽을 본다.
+function greet() {
+  for (const p of G.world.pets) {
+    if (bondOf(petById(p.id).love) < 1 || p.state === 'nap' || p.eat) continue;
+    p.wag = 1.6;
+    if (p.state === 'idle') {
+      p.dir = G.state.door >= p.x ? 1 : -1;
+      p.t = Math.max(p.t, 1.2);
+    }
   }
 }
 
@@ -468,19 +482,29 @@ const patience = () => PATIENCE * (1 + 0.15 * G.state.pets.filter(p => bondOf(p.
 export const patienceLeft = c => 1 - c.t / patience();
 
 // ───── 동물 친구 ─────
-// 친밀도 단계(data.js의 BONDS)마다 생기는 일: 1 손님이 더 기다려 줌, 2 선물을 물어 옴, 3 신나는 시간 두 배, 4 서빙이 빨라짐
+// 친밀도 단계(data.js의 BONDS)마다 생기는 일: 1 손님을 반기고 손님이 더 기다려 줌, 2 선물을 물어 옴, 3 신나는 시간 두 배, 4 서빙이 빨라짐
+export const TREAT_TIME = 1.3; // 간식을 받아서 다 먹는 데 걸리는 시간(초)
 
 function updatePet(p, dt) {
   const w = G.world, s = G.state;
   const bond = bondOf(petById(p.id).love);
-  p.boost = Math.max(0, p.boost - dt);
-  p.petCd = Math.max(0, p.petCd - dt);
+  for (const k of ['boost', 'petCd', 'joy', 'wag', 'spin']) p[k] = Math.max(0, p[k] - dt);
   const speed = PET_SPEED * (p.boost > 0 ? 1.6 : 1) * (bond >= 4 ? 1.15 : 1);
   // 물어 온 선물은 받아 갈 때까지 머리 위에 떠 있다. 구경 중인 가게에서는 생기지 않는다.
   if (!G.visit && !p.gift && bond >= 2 && (p.giftT -= dt) <= 0) {
     p.gift = 5 + rand(6) + level();
     p.giftT = 240 + Math.random() * 180;
   }
+  // 간식을 다 먹으면 기뻐한다. 좋아하는 간식이면 제자리에서 돌고 한 번 더 운다. 먹는 동안에는 서빙 중이 아니면 제자리에 있는다.
+  if (p.eat && (p.eat.t -= dt) <= 0) {
+    const { fav } = p.eat;
+    p.eat = null;
+    rejoice(p, fav ? 3 : 2);
+    if (fav) p.spin = 0.8;
+    for (let i = 0; i <= (fav ? 1 : 0); i++) w.floats.push({ kind: 'heart', x: p.x + i * 0.5, y: p.y - 0.4 - i * 0.3, t: -i * 0.15 });
+    emit('cheer', { pet: petById(p.id), fav });
+  }
+  if (p.eat && p.state !== 'serve') return;
 
   if (p.state === 'serve') {
     const c = w.customers.find(c => c.id === p.target);
@@ -536,6 +560,13 @@ function addLove(pet, n) {
   if (!G.visit && bondOf(pet.love) > before) emit('bond', { pet, stage: bondOf(pet.love) });
 }
 
+// 기뻐한다: 웃는 얼굴로 그동안 제자리에 있는다. 걷던 길은 멈추고, 서빙 중이면 하던 서빙을 마저 한다.
+function rejoice(p, secs) {
+  p.joy = secs;
+  if (p.state === 'walk') { p.state = 'idle'; p.path = []; }
+  if (p.state === 'idle') p.t = Math.max(p.t, secs);
+}
+
 // 쓰다듬기. 물어 온 선물이 있으면 받는다.
 export function petPet(id) {
   const p = G.world.pets.find(p => p.id === id);
@@ -552,15 +583,17 @@ export function petPet(id) {
   if (p.boost <= 0) addLove(pet, 1);
   p.boost = PET_BOOST_TIME * (bondOf(pet.love) >= 3 ? 2 : 1);
   if (p.state === 'nap') { p.state = 'idle'; p.t = 1; }
+  rejoice(p, 1.5);
   G.world.floats.push({ kind: 'heart', x: p.x, y: p.y - 0.4, t: 0 });
   bump('pet', 1);
-  emit('pet');
+  emit('pet', pet);
 }
 
 // 오늘 이 친구에게 준 간식 수
 export const fedToday = pet => (pet.fed?.day === dayKey() ? pet.fed.n : 0);
 
 // 간식을 사서 바로 준다. 친구마다 하루 TREATS_PER_DAY개까지. 좋아하는 간식이면 친밀도가 두 배로 오른다.
+// 가게에 있는 친구가 간식을 받아먹고(TREAT_TIME), 다 먹으면 updatePet이 기뻐하는 모습을 보여 준다.
 export function feed(petId, treatId) {
   const s = G.state, pet = petById(petId), treat = TREATS[treatId];
   if (fedToday(pet) >= TREATS_PER_DAY) return fail(`${josa(pet.name, '은', '는')} 오늘 배가 불러요. 내일 또 주세요`);
@@ -571,11 +604,9 @@ export function feed(petId, treatId) {
   emit('feed', { pet, fav }); // 단계가 오르면 그 소식이 뒤이어 나온다
   addLove(pet, treat.love * (fav ? 2 : 1));
   const p = G.world.pets.find(p => p.id === petId);
-  if (p) {
-    p.boost = PET_BOOST_TIME * (bondOf(pet.love) >= 3 ? 2 : 1);
-    if (p.state === 'nap') { p.state = 'idle'; p.t = 1; }
-    for (let i = 0; i <= (fav ? 1 : 0); i++) G.world.floats.push({ kind: 'heart', x: p.x + i * 0.5, y: p.y - 0.4 - i * 0.3, t: -i * 0.15 });
-  }
+  p.boost = PET_BOOST_TIME * (bondOf(pet.love) >= 3 ? 2 : 1);
+  p.eat = { icon: treat.icon, t: TREAT_TIME, fav };
+  if (p.state === 'nap') { p.state = 'idle'; p.t = 1; }
   bump('treat', 1);
   return true;
 }

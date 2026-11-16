@@ -699,6 +699,29 @@ const PET_LEGS = {
   b: ['..ff.FF.ff......', '..qq.ff.qq......', '................'],
   sleep: ['................'], // 다리를 접고 엎드린 모습
 };
+// 그림의 몇 칸만 바꾼다. edits: [[줄, 칸, '글자들'], …]
+const patch = (rows, edits) => {
+  const out = [...rows];
+  for (const [y, x, chars] of edits) out[y] = out[y].slice(0, x) + chars + out[y].slice(x + chars.length);
+  return out;
+};
+// 꼬리 흔들기: 꼬리 칸만 바꾼 그림 두 장(1, 2)을 번갈아 보여 준다.
+const PET_TAILS = {
+  schnauzer: [[[4, 1, 'g.']], [[4, 2, '.g']]],
+  maltese: [[[4, 1, 'g.']], [[4, 2, '.g']]],
+  shiba: [[[3, 1, 'gg.'], [4, 1, 'g.']], [[3, 1, '.gg']]],
+  poodle: [[], [[3, 1, '..g'], [4, 1, '.gg']]],
+  cat: [[], [[3, 1, '.g']]],
+};
+// 기쁜 얼굴: 웃는 눈(z, 바깥으로 처진 ´ ｀ 모양)과 내민 혀. 눈은 모든 종이 5번 줄의 8, 12번 칸에 있다.
+const HAPPY_EYES = [[5, 8, 'z'], [4, 9, 'z'], [4, 11, 'z'], [5, 12, 'z']];
+const PET_HAPPY = {
+  schnauzer: [...HAPPY_EYES, [9, 10, 'p']],
+  maltese: [...HAPPY_EYES, [9, 10, 'p']],
+  shiba: [...HAPPY_EYES, [9, 10, 'p']],
+  poodle: [...HAPPY_EYES, [9, 10, 'p']],
+  cat: [...HAPPY_EYES, [7, 10, 'p']],
+};
 const DARK = '#1e1616', PINK = '#f7a8a0';
 // 종 id → [몸 그림, 색]. data.js의 PETS와 id가 같아야 한다.
 const PET_PAL = {
@@ -711,10 +734,20 @@ const PET_PAL = {
   graycat: ['cat', { g: '#8e97ab', G: '#6c7488', l: '#8e97ab', s: '#8e97ab', w: '#b3bbcb', e: '#2f7d46', n: '#5f626e', p: PINK, f: '#8e97ab', F: '#6c7488', q: '#b3bbcb' }],
 };
 export const PET_IDS = Object.keys(PET_PAL);
-for (const [id, [body, pal]] of Object.entries(PET_PAL)) {
-  def(`pet_${id}_a`, [...PET_ROWS[body], ...PET_LEGS.a], { pal });
-  def(`pet_${id}_b`, [...PET_ROWS[body], ...PET_LEGS.b], { pal });
-  def(`pet_${id}_sleep`, [...PET_ROWS[body], ...PET_LEGS.sleep], { pal: { ...pal, e: pal.G } }); // 눈을 감는다
+// 웃는 눈은 털 색과 구분되는 색으로 긋는다(검은 턱시도 고양이는 눈 색 그대로).
+const smileEyes = id => (id === 'tuxedo' ? '#ffd34d' : DARK);
+// 그림 이름은 pet_<종>_<다리 a|b><꼬리 없음|1|2><기쁜 얼굴이면 h>. 예: pet_shiba_a, pet_shiba_b2h
+for (const [id, [body, basePal]] of Object.entries(PET_PAL)) {
+  const pal = { ...basePal, z: smileEyes(id) };
+  const rest = PET_ROWS[body];
+  const tails = { '': rest, 1: patch(rest, PET_TAILS[body][0]), 2: patch(rest, PET_TAILS[body][1]) };
+  for (const [tail, rows] of Object.entries(tails)) {
+    for (const legs of ['a', 'b']) {
+      def(`pet_${id}_${legs}${tail}`, [...rows, ...PET_LEGS[legs]], { pal });
+      def(`pet_${id}_${legs}${tail}h`, [...patch(rows, PET_HAPPY[body]), ...PET_LEGS[legs]], { pal });
+    }
+  }
+  def(`pet_${id}_sleep`, [...rest, ...PET_LEGS.sleep], { pal: { ...pal, e: pal.G } }); // 눈을 감는다
 }
 
 // ───── 옷 ─────

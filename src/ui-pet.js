@@ -4,7 +4,7 @@ import { PETS, PET_NAME_MAX, WEAR, WEAR_SLOTS, SEASONS, BONDS, TREATS, TREATS_PE
 import { $, esc, setHTML } from './dom.js';
 import { sfx } from './sfx.js';
 
-export function createPetUI({ icon, coin, toast, openSheet, renderer, refresh }) {
+export function createPetUI({ icon, coin, toast, openSheet, closeSheet, renderer, refresh }) {
   let current = null; // 지금 보고 있는 친구 id
   let trying = null; // 사기 전에 입혀 보는 옷 id. 같은 옷을 한 번 더 눌러야(구매 확정) 산다.
   let treating = null; // 한 번 눌러 둔 간식 id. 한 번 더 눌러야(구매 확정) 사서 준다.
@@ -66,12 +66,12 @@ export function createPetUI({ icon, coin, toast, openSheet, renderer, refresh })
       <div class="center stack">
         <img class="px hero" src="${renderer.petURL(pet.species, shown)}" alt="">
         <button type="button" class="btn primary big" data-act="pet">${esc(pet.name)} 쓰다듬기</button>
-        <p class="muted">쓰다듬으면 신나서 한동안 더 빨리 서빙하고, 친밀도가 1 올라요. 신나 있는 동안에는 더 쓰다듬어도 오르지 않아요. 가게에서 직접 눌러도 돼요.</p>
+        <p class="muted">쓰다듬으면 창이 닫히고 가게에서 좋아하는 모습이 보여요. 신나서 한동안 더 빨리 서빙하고, 친밀도가 1 올라요. 신나 있는 동안에는 더 쓰다듬어도 오르지 않아요. 가게에서 직접 눌러도 돼요.</p>
       </div>
       <div id="petBond" class="stack"></div>
       <hr>
       <p><b>간식</b> <small class="muted">오늘 ${fed}/${TREATS_PER_DAY}</small></p>
-      <p class="muted">간식을 주면 친밀도가 많이 올라요. 친구마다 하루에 ${TREATS_PER_DAY}개까지 먹어요. 한 번 누르고, 한 번 더 눌러 구매 확정해야 사요.</p>
+      <p class="muted">간식을 주면 친밀도가 많이 올라요. 친구마다 하루에 ${TREATS_PER_DAY}개까지 먹어요. 한 번 누르고, 한 번 더 눌러 구매 확정해야 사요. 주고 나면 창이 닫히고 가게에서 먹는 모습이 보여요.</p>
       <div class="hscroll">${treats}</div>
       <hr>
       <p><b>옷장</b></p>
@@ -87,7 +87,8 @@ export function createPetUI({ icon, coin, toast, openSheet, renderer, refresh })
       actions: {
         pick(el) { sfx('tap'); openPets(Number(el.dataset.id)); },
         adopt() { sfx('tap'); openAdopt(); },
-        pet() { petPet(pet.id); },
+        // 쓰다듬거나 간식을 주면 창을 닫는다. 창이 가게를 가려서 친구가 좋아하는 모습이 안 보이기 때문이다.
+        pet() { closeSheet(); petPet(pet.id); },
         treat(el) {
           const tid = el.dataset.id;
           if (treating !== tid) {
@@ -99,7 +100,9 @@ export function createPetUI({ icon, coin, toast, openSheet, renderer, refresh })
           }
           treating = null;
           if (!feed(pet.id, tid)) { openPets(pet.id, true); return; }
-          changed();
+          save();
+          refresh();
+          closeSheet();
         },
         wear(el) {
           const wid = el.dataset.id;

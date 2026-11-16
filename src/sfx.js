@@ -9,9 +9,21 @@ const SOUNDS = {
   serve: [[880, 0.05]],
   coin: [[988, 0.05], [1319, 0.09]],
   place: [[440, 0.05], [554, 0.05]],
-  bark: [[240, 0.05], [190, 0.08]],
+  eat: [[220, 0.04], [165, 0.05], [220, 0.04], [165, 0.06]],
   level: [[523, 0.08], [659, 0.08], [784, 0.08], [1047, 0.22]],
   err: [[160, 0.12]],
+};
+
+// 동물 친구의 목소리. 종마다 다르다. 한 번 우는 동안 음 높이가 f의 처음 → 가운데 → 끝으로 미끄러진다(가운데는 길이의 30% 지점).
+// wave: 소리 결, dur: 한 번 우는 길이(초), gap: 다음 울음까지 쉬는 시간(초), times: 우는 횟수, vol: 크기
+const VOICES = {
+  schnauzer: { wave: 'sawtooth', f: [210, 300, 150], dur: 0.11, gap: 0.08, times: 2, vol: 0.07 }, // 굵게 두 번
+  maltese: { wave: 'square', f: [820, 1050, 760], dur: 0.055, gap: 0.045, times: 2, vol: 0.04 }, // 높고 빠르게 앙앙
+  shiba: { wave: 'sawtooth', f: [380, 520, 300], dur: 0.13, gap: 0.1, times: 1, vol: 0.06 }, // 짧게 한 번
+  poodle: { wave: 'square', f: [520, 700, 880], dur: 0.07, gap: 0.05, times: 2, vol: 0.04 }, // 끝이 올라가는 통통 튀는 소리
+  cheese: { wave: 'triangle', f: [560, 840, 600], dur: 0.4, gap: 0.12, times: 1, vol: 0.12 }, // 야옹
+  tuxedo: { wave: 'triangle', f: [430, 640, 420], dur: 0.5, gap: 0.12, times: 1, vol: 0.13 }, // 낮고 느긋한 야옹
+  graycat: { wave: 'triangle', f: [760, 1080, 820], dur: 0.28, gap: 0.1, times: 1, vol: 0.11 }, // 높고 짧은 냐옹
 };
 
 let ctx = null;
@@ -52,5 +64,28 @@ export function sfx(name) {
     osc.start(t);
     osc.stop(t + dur);
     t += dur;
+  }
+}
+
+// 동물 친구가 운다. excited면 한 번 더 운다(좋아하는 간식을 먹었을 때).
+export function voice(species, excited = false) {
+  if (!G.state.sound) return;
+  const ac = audioCtx(), v = VOICES[species];
+  if (!ac || !v) return;
+  const [from, mid, to] = v.f;
+  let t = ac.currentTime;
+  for (let i = 0; i < v.times + (excited ? 1 : 0); i++) {
+    const osc = ac.createOscillator(), gain = ac.createGain();
+    osc.type = v.wave;
+    osc.frequency.setValueAtTime(from, t);
+    osc.frequency.exponentialRampToValueAtTime(mid, t + v.dur * 0.3);
+    osc.frequency.exponentialRampToValueAtTime(to, t + v.dur);
+    gain.gain.setValueAtTime(0.001, t);
+    gain.gain.exponentialRampToValueAtTime(v.vol, t + v.dur * 0.15);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + v.dur);
+    osc.connect(gain).connect(ac.destination);
+    osc.start(t);
+    osc.stop(t + v.dur);
+    t += v.dur + v.gap;
   }
 }

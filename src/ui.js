@@ -11,7 +11,7 @@ import {
 } from './data.js';
 import { $, esc, setText, setHTML, setSrc, copyText } from './dom.js';
 import { share } from './device.js';
-import { sfx } from './sfx.js';
+import { sfx, voice } from './sfx.js';
 import { syncMusic } from './music.js';
 import { createPetUI } from './ui-pet.js';
 import { createMenuUI } from './ui-menu.js';
@@ -498,11 +498,13 @@ export function initUI({ atlas, renderer }) {
   on('sale', () => sfx('coin'));
   on('serve', () => sfx('serve'));
   on('collect', r => { sfx('done'); toast(`${r.name} ${r.n}그릇을 진열했어요`); });
-  on('pet', () => sfx('bark'));
+  on('pet', pet => voice(pet.species));
+  // 간식: 먼저 먹는 소리가 나고, 다 먹으면(cheer) 그 종의 목소리로 운다.
   on('feed', ({ pet, fav }) => {
-    sfx('bark');
+    sfx('eat');
     toast(fav ? `${josa(pet.name, '이', '가')} 제일 좋아하는 간식이에요!` : `${josa(pet.name, '이', '가')} 맛있게 먹었어요`);
   });
+  on('cheer', ({ pet, fav }) => voice(pet.species, fav));
   on('gift', ({ pet, coins }) => { sfx('coin'); toast(`${josa(pet.name, '이', '가')} 선물을 물어 왔어요! 코인 ${coins}개`); });
   on('bond', ({ pet, stage }) => {
     sfx('level');

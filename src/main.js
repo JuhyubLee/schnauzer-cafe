@@ -153,7 +153,8 @@ onBack(ui.back);
 const SYNC_EVERY = 15;
 let last = performance.now(), uiT = 0, syncT = SYNC_EVERY - 3, saved = '';
 function frame(now) {
-  const dt = Math.min(0.1, (now - last) / 1000);
+  // 첫 프레임은 브라우저가 주는 시각(now)이 last보다 이를 수 있어서, 시간이 거꾸로 가지 않게 0 아래로는 내리지 않는다.
+  const dt = Math.max(0, Math.min(0.1, (now - last) / 1000));
   last = now;
   tick(dt);
   renderer.draw();

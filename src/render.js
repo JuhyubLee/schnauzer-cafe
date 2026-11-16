@@ -1,5 +1,5 @@
 // 캔버스 그리기. 논리 해상도(1칸 = 16px)로 그리고, 확대는 CSS가 한다.
-import { G, MAX_COLS, cookState, patienceLeft, recipeOf, petById } from './game.js';
+import { G, MAX_COLS, TREAT_TIME, cookState, patienceLeft, recipeOf, petById } from './game.js';
 import { FURN, FLOORS, WALLS, PETS, PHOTO_W, PHOTO_H, START_DOOR } from './data.js';
 import { skyAt, skyCSS, drawView } from './sky.js';
 
@@ -17,7 +17,9 @@ export const photoRect = s => ({ x: PAD + 62 + wallShift(s), y: 4, w: 28, h: 24 
 const GLOW_R = 22; // 밤에 조명이 밝히는 둘레의 반지름
 
 const INK = '#3b2b2b';
+const INK_RGB = 'rgb(59,43,43)'; // INK를 캔버스가 돌려주는 색 값으로 적은 것
 const HAT_ROOM = 3; // 모자가 동물 그림 위로 올라가는 줄 수
+const TREAT_DROP = 0.5; // 받은 간식이 입까지 내려오는 시간(초)
 const DIGITS = {
   0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111',
   4: '101101111001001', 5: '111100111001111', 6: '111100111101111', 7: '111001001010010',
@@ -183,6 +185,36 @@ export function createRenderer(canvas, atlas) {
     if (worn.hat) ctx.drawImage(atlas[`wear_${worn.hat}${f}`], x, y - HAT_ROOM + PETS[species].hatDy);
   }
 
+  // 음식 그림을 반 크기로 줄인 것(친구가 물고 가는 접시). 2×2칸마다 가장 많은 색을 고르고 바깥선을 다시 두른다.
+  // 나만의 메뉴는 고치면 atlas의 그림이 새 것으로 바뀌므로, 그림 자체를 열쇠로 기억해 둔다.
+  const minis = new WeakMap();
+  function miniOf(src) {
+    if (!minis.has(src)) {
+      minis.set(src, makeCanvas(10, 10, c => {
+        const px = src.getContext('2d').getImageData(0, 0, 16, 16).data;
+        const cells = [];
+        for (let i = 0; i < 64; i++) {
+          const counts = {};
+          for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+            const at = (((i >> 3) * 2 + dy) * 16 + (i & 7) * 2 + dx) * 4;
+            const color = `rgb(${px[at]},${px[at + 1]},${px[at + 2]})`;
+            if (px[at + 3] && color !== INK_RGB) counts[color] = (counts[color] || 0) + 1;
+          }
+          const [color, n] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0] || [];
+          cells.push(n >= 2 ? color : null);
+        }
+        const filled = (x, y) => x >= 0 && y >= 0 && x < 8 && y < 8 && cells[y * 8 + x];
+        for (let y = -1; y <= 8; y++) {
+          for (let x = -1; x <= 8; x++) {
+            const color = filled(x, y) || ((filled(x - 1, y) || filled(x + 1, y) || filled(x, y - 1) || filled(x, y + 1)) && INK);
+            if (color) { c.fillStyle = color; c.fillRect(x + 1, y + 1, 1, 1); }
+          }
+        }
+      }));
+    }
+    return minis.get(src);
+  }
+
   function num(text, x, y, color = '#fff7ea') {
     for (const pass of [INK, color]) {
       g.fillStyle = pass;
@@ -325,21 +357,38 @@ export function createRenderer(canvas, atlas) {
     sprOnTile(`cust${c.look}_${c.up ? 'back_' : ''}${frame}`, c.x, c.y, seated ? -5 + bob : 0);
   }
 
+  // 동물 그림은 pet_<종>_<다리><꼬리><얼굴>이다(sprites.js). 꼬리는 신나 있거나 손님을 반길 때 흔들고, 얼굴은 기쁠 때 웃는다.
   function drawPet(p, time) {
     const pet = petById(p.id);
     const napping = p.state === 'nap';
-    const moving = p.state === 'walk' || p.state === 'serve';
-    const frame = napping ? 'sleep' : moving && Math.floor(p.walk * 8) % 2 ? 'b' : 'a';
-    const hop = p.boost > 0 && !moving && !napping && Math.floor(time * 6) % 2 ? -1 : 0;
+    const walking = p.state === 'serve' || (p.state === 'walk' && !p.eat);
+    const legs = walking && Math.floor(p.walk * 8) % 2 ? 'b' : 'a';
+    // 개는 꼬리를 빠르게, 고양이는 느긋하게 흔든다.
+    const tail = p.boost > 0 || p.wag > 0 ? 1 + Math.floor(time * (PETS[pet.species].cat ? 2.5 : 9)) % 2 : '';
+    const frame = napping ? 'sleep' : `${legs}${tail}${p.joy > 0 ? 'h' : ''}`;
+    // 간식은 머리 위에서 입으로 내려오고(TREAT_DROP초), 그 뒤로는 고개를 까딱이며 씹는다.
+    const chewing = p.eat && p.eat.t <= TREAT_TIME - TREAT_DROP;
+    let dy = 0;
+    if (chewing) dy = Math.floor(time * 8) % 2;
+    else if (!walking && !napping) dy = p.joy > 0 ? -2 * (Math.floor(time * 7) % 2) : p.boost > 0 ? -(Math.floor(time * 6) % 2) : 0;
+    // 좋아하는 간식을 먹으면 제자리에서 빙글 돈다.
+    const flip = (p.dir < 0) !== (Math.floor(p.spin * 6) % 2 === 1);
     const h = atlas[`pet_${pet.species}_${frame}`].height;
-    const x = Math.round(PAD + p.x * TILE), y = Math.round(WALL_H + (p.y + 1) * TILE - h - 1 + hop);
-    petAt(g, x, y, pet.species, frame, pet.wear, p.dir < 0);
+    const x = Math.round(PAD + p.x * TILE), y = Math.round(WALL_H + (p.y + 1) * TILE - h - 1 + dy);
+    petAt(g, x, y, pet.species, frame, pet.wear, flip);
     if (napping) {
       const t = time % 1.6 / 1.6;
       g.globalAlpha = 1 - t;
       spr('zzz', x + 11, y - 2 - t * 6);
       g.globalAlpha = 1;
     }
+    if (p.eat && !chewing) {
+      const fall = (TREAT_TIME - p.eat.t) / TREAT_DROP;
+      g.drawImage(atlas[p.eat.icon], flip ? x - 3 : x + 2, Math.round(y - 11 + fall * 12));
+    }
+    // 서빙하러 갈 때는 손님이 시킨 음식을 작게 줄여 입에 물고 간다.
+    const customer = p.state === 'serve' && G.world.customers.find(c => c.id === p.target);
+    if (customer) g.drawImage(miniOf(atlas[recipeOf(customer.order).icon]), flip ? x - 2 : x + 8, y + 5);
   }
 
   function drawOverlays(s, w, time) {
