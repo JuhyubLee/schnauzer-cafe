@@ -37,6 +37,11 @@ export const SEASONS = {
 // 계절 한정이 아니거나(season 없음) 지금이 그 계절이면 살 수 있다.
 export const onSale = (thing, date = new Date()) => !thing.season || SEASONS[thing.season].months.includes(date.getMonth() + 1);
 
+// 설정에서 고르는 배경 노래. 곡과 '계절에 맞춰'의 규칙은 music.js에 있다.
+export const SONG_CHOICES = {
+  auto: '계절에 맞춰', main: '오르골 왈츠', spring: '봄', summer: '여름', autumn: '가을', winter: '겨울', xmas: '크리스마스',
+};
+
 // 꾸미기 목록에서 가구를 나눠 보여 주는 분류
 export const FURN_GROUPS = { seat: '테이블·의자', kitchen: '주방', deco: '장식', light: '조명', mat: '깔개', season: '계절' };
 

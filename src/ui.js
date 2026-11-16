@@ -7,7 +7,7 @@ import {
 } from './game.js';
 import {
   FURN, FURN_GROUPS, FLOORS, WALLS, SEASONS, EXPAND_DIRS, LEVEL_XP, PETS, BONDS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL,
-  stoveLimit, fmtTime, onSale,
+  SONG_CHOICES, stoveLimit, fmtTime, onSale,
 } from './data.js';
 import { $, esc, setText, setHTML, setSrc, copyText } from './dom.js';
 import { share } from './device.js';
@@ -192,6 +192,8 @@ export function initUI({ atlas, renderer }) {
           <button type="button" class="btn" data-act="music">${onOff('음악', s.music)}</button>
           <button type="button" class="btn" data-act="sound">${onOff('효과음', s.sound)}</button>
         </div>
+        <button type="button" class="btn" data-act="song">노래: ${SONG_CHOICES[s.song] || SONG_CHOICES.auto}</button>
+        <p class="muted">노래 버튼을 누를 때마다 다음 노래로 바뀌어요. "계절에 맞춰"는 지금 계절의 노래와 오르골 왈츠를 번갈아 들려주고, 12월 1일부터 25일까지는 캐럴이 나와요.</p>
         <button type="button" class="btn" data-act="dim">${onOff('밤에 가게 어둡게', s.dim)}</button>
         <hr>
         <p><b>가게 백업</b></p>
@@ -218,6 +220,13 @@ export function initUI({ atlas, renderer }) {
           toast('이름을 바꿨어요');
         },
         music(el) { s.music = !s.music; el.textContent = onOff('음악', s.music); save(); syncMusic(); },
+        song(el) {
+          const ids = Object.keys(SONG_CHOICES);
+          s.song = ids[(ids.indexOf(s.song) + 1) % ids.length];
+          el.textContent = `노래: ${SONG_CHOICES[s.song]}`;
+          save();
+          syncMusic();
+        },
         sound(el) { s.sound = !s.sound; el.textContent = onOff('효과음', s.sound); save(); sfx('tap'); },
         dim(el) { s.dim = !s.dim; el.textContent = onOff('밤에 가게 어둡게', s.dim); save(); sfx('tap'); },
         async backup() {

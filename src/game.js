@@ -48,6 +48,7 @@ function freshState() {
     custom: [], nextCustom: 1,
     notes: [],
     tut: 0, sound: true, music: true, dim: true,
+    song: 'auto', // 배경 노래(data.js의 SONG_CHOICES)
     photo: null,
     share: false, // 가게 모습을 서버에 올려 최신 모습을 보여 줄지. 가게 번호(sid)와 열쇠(skey)는 visit.js가 처음 쓸 때 채운다
     stamps: 0, daily: null, // 도장 수와 오늘의 주문(daily.js)
@@ -77,6 +78,7 @@ function upgrade(s) {
   s.share ??= false;
   s.stamps ??= 0;
   s.daily ??= null;
+  s.song ??= 'auto';
   delete s.lastSeen; // 자리를 비운 동안 팔던 때 쓰던 값
   return s;
 }
@@ -183,7 +185,7 @@ function usable(s) {
     && Array.isArray(s.floor) && s.floor.length === s.rows * s.cols && s.floor.every(f => has(FLOORS, f))
     && has(WALLS, s.wall) && Array.isArray(s.walls) && Array.isArray(s.notes)
     && (s.photo === null || validPhoto(s.photo))
-    && typeof s.share === 'boolean'
+    && typeof s.share === 'boolean' && typeof s.song === 'string'
     && (s.sid === undefined || /^[a-z0-9]{6,24}$/.test(s.sid)) && (s.skey === undefined || /^[a-f0-9]{32}$/.test(s.skey))
     && obj(s.inv) && obj(s.stock) && obj(s.stats)
     && Array.isArray(s.closet) && s.closet.every(id => has(WEAR, id))

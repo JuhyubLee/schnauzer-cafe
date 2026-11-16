@@ -227,7 +227,7 @@ function shopFrom(snap) {
     }),
     nextPet: snap.p.length + 1, closet: [],
     custom, nextCustom: custom.length + 1,
-    notes: [], tut: 4, sound: home.sound, music: home.music,
+    notes: [], tut: 4, sound: home.sound, music: home.music, song: home.song,
     stamps: 0, daily: null,
     stats: { sold: 0, cooked: 0 },
   };
