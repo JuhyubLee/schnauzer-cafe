@@ -7,8 +7,8 @@ import {
   furnOf, levelIn, shopNo, rounds, regulars, setShow, displayed, priceOf,
 } from './game.js';
 import {
-  FURN, FURN_GROUPS, FLOORS, WALLS, SEASONS, EXPAND_DIRS, LEVEL_XP, PETS, BONDS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL,
-  SONG_CHOICES, SHOP_TYPES, REGULAR_EVERY, DISPLAY_BONUS, stoveLimit, fmtTime, onSale, shopOf,
+  FURN, FURN_GROUPS, FLOORS, WALLS, SEASONS, EXPAND_DIRS, PETS, BONDS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL,
+  SONG_CHOICES, SHOP_TYPES, REGULAR_EVERY, DISPLAY_BONUS, stoveLimit, fmtTime, onSale, shopOf, levelXp,
 } from './data.js';
 import { $, esc, setText, setHTML, setSrc, copyText } from './dom.js';
 import { share } from './device.js';
@@ -501,8 +501,8 @@ export function initUI({ atlas, renderer }) {
     $('coinBox').hidden = !!G.visit;
     $('shopBtn').disabled = !!G.visit;
     setText($('lvNum'), `Lv ${lv}`);
-    const lo = LEVEL_XP[lv - 1], hi = LEVEL_XP[lv];
-    $('xpFill').style.width = hi ? `${Math.round(((s.xp - lo) / (hi - lo)) * 100)}%` : '100%';
+    const lo = levelXp(lv), hi = levelXp(lv + 1);
+    $('xpFill').style.width = `${Math.round(((s.xp - lo) / (hi - lo)) * 100)}%`;
     const first = s.pets[0];
     if (first) {
       setText($('petLabel'), s.pets.length > 1 ? '친구들' : first.name);

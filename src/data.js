@@ -321,12 +321,23 @@ export const WIDENINGS = {
 };
 export const EXPAND_DIRS = { up: '위로', down: '아래로', left: '왼쪽으로', right: '오른쪽으로' };
 
-// 누적 경험치 기준. LEVEL_XP[i] 이상이면 레벨 i+1.
+// 누적 경험치 기준. LEVEL_XP[i] 이상이면 레벨 i+1. 메뉴·가구·넓히기는 이 표의 마지막 레벨(TOP_LEVEL)까지에서 다 열린다.
 export const LEVEL_XP = [0, 20, 60, 140, 280, 500, 850, 1400, 2200, 3400, 5200, 8000];
+export const TOP_LEVEL = LEVEL_XP.length;
+// 그 뒤로도 레벨은 끝없이 오른다(2026-11-16 사용자). 새로 열리는 것은 없고 레벨 선물만 받는다.
+// TOP_LEVEL 다음 레벨은 LATER_XP만큼, 그다음부터는 레벨마다 LATER_STEP씩 더 모아야 오른다(하루 30분쯤이면 3~4일에 한 레벨).
+export const LATER_XP = 3000;
+export const LATER_STEP = 300;
+// lv 레벨이 되는 데 필요한 누적 경험치
+export const levelXp = lv => {
+  if (lv <= TOP_LEVEL) return LEVEL_XP[lv - 1];
+  const k = lv - TOP_LEVEL;
+  return LEVEL_XP[TOP_LEVEL - 1] + LATER_XP * k + LATER_STEP * k * (k - 1) / 2;
+};
 
 export const levelOf = xp => {
   let lv = 1;
-  while (lv < LEVEL_XP.length && xp >= LEVEL_XP[lv]) lv++;
+  while (xp >= levelXp(lv + 1)) lv++;
   return lv;
 };
 

@@ -439,7 +439,7 @@ const VENDING = (sign, b1, b2, b3) => [
 def('vending', VENDING('yayayayaya', 'y', 'G', 'y'));
 def('vending_b', VENDING('ayayayayay', 'G', 'y', 'G'));
 
-// 레벨 12(최고 레벨) 기념: 황금 슈나우저 동상. 동물 친구 슈나우저(PET_ROWS)와 같은 모습을 금빛으로 칠했다.
+// 레벨 12(모든 것이 다 열리는 레벨) 기념: 황금 슈나우저 동상. 동물 친구 슈나우저(PET_ROWS)와 같은 모습을 금빛으로 칠했다.
 // 두 번째 그림에는 몸통에 반짝임(q)이 있다.
 const STATUE = body => [
   '................',

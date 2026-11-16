@@ -6,8 +6,8 @@ import { G, level, enterVisit, leaveVisit, save, isHere, MAX_ROWS, MAX_COLS } fr
 import { putShop, getShop, deleteShop, reportShop } from './cloud.js';
 import {
   CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FLOORS, WALLS, PETS, PET_SLOTS, PET_NAME_MAX,
-  WEAR, START_ROWS, START_COLS, START_DOOR, LEVEL_XP, VISIT_GIFT, GIFTS_PER_DAY, STOVE_SPEED, SITE_URL, FIRST_SHOP,
-  SHOP_TYPES, SHOP_RECIPES, SHOP_NAME_MAX,
+  WEAR, START_ROWS, START_COLS, START_DOOR, VISIT_GIFT, GIFTS_PER_DAY, STOVE_SPEED, SITE_URL, FIRST_SHOP,
+  SHOP_TYPES, SHOP_RECIPES, SHOP_NAME_MAX, levelXp,
 } from './data.js';
 import { through } from './bytes.js';
 import { validIcon } from './sprites.js';
@@ -104,7 +104,7 @@ function sanitize(raw) {
   if (!sid || !name) return null;
   const type = raw.t ?? FIRST_SHOP;
   if (!has(SHOP_TYPES, type)) return null;
-  if (!int(raw.l) || raw.l < 1 || raw.l > LEVEL_XP.length) return null;
+  if (!int(raw.l) || raw.l < 1 || raw.l > 9999) return null; // 레벨에는 끝이 없다. 말이 안 되게 큰 값만 거른다
   if (!int(raw.r) || raw.r < START_ROWS || raw.r > MAX_ROWS) return null;
   // 가로 칸 수(k)와 문 자리(d)가 없는 초대장은 옆으로 넓히기가 생기기 전에 만든 것이다.
   const cols = raw.k ?? START_COLS, door = raw.d ?? START_DOOR;
@@ -206,7 +206,7 @@ function shopFrom(snap) {
   const home = G.state;
   return {
     v: 1, started: true, type: snap.t, others: [], shopName: snap.n,
-    coins: 0, xp: LEVEL_XP[snap.l - 1], rows: snap.r, cols: snap.k, door: snap.d,
+    coins: 0, xp: levelXp(snap.l), rows: snap.r, cols: snap.k, door: snap.d,
     items: snap.i.map(([type, x, y, lv], i) => ({ id: i + 1, type, x, y, ...(type === 'stove' ? { lv, cook: null } : {}) })),
     nextId: snap.i.length + 1,
     floor: [...snap.f], wall: snap.w, walls: [snap.w],
