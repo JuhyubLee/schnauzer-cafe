@@ -15,7 +15,8 @@ export function createAlleyUI({ icon, coin, toast, openSheet, closeSheet, refres
         const ready = shop.items.filter(it => it.cook && now >= it.cook.end).length;
         return `<div class="row">${img}
           <span class="meta"><b>${no}호점 ${esc(shop.shopName)}</b>
-            <small>${cfg.name} · Lv ${levelOf(shop.xp)} · ${coin(shop.coins)}${ready ? ` · 다 된 요리 ${ready}개` : ''}</small></span>
+            <small>${cfg.name} · Lv ${levelOf(shop.xp)} · ${coin(shop.coins)}</small>
+            ${ready ? `<small>다 된 요리 ${ready}개</small>` : ''}</span>
           <span class="right">${here ? '<small>지금 여기</small>'
     : `<button type="button" class="btn primary" data-act="go" data-id="${type}">들어가기</button>`}</span></div>`;
       }
