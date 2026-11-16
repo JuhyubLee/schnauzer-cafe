@@ -176,8 +176,10 @@ export function createRenderer(canvas, atlas) {
   function petAt(ctx, x, y, species, frame, worn, flip = false) {
     const f = flip ? '~' : '';
     ctx.drawImage(atlas[`pet_${species}_${frame}${f}`], x, y);
+    if (worn.back) ctx.drawImage(atlas[`wear_${worn.back}${f}`], x, y);
     if (worn.body) ctx.drawImage(atlas[`wear_${worn.body}${f}`], x, y);
     if (worn.neck) ctx.drawImage(atlas[`wear_${worn.neck}${f}`], x, y);
+    if (worn.face) ctx.drawImage(atlas[`wear_${worn.face}${f}`], x, y);
     if (worn.hat) ctx.drawImage(atlas[`wear_${worn.hat}${f}`], x, y - HAT_ROOM + PETS[species].hatDy);
   }
 
@@ -360,6 +362,10 @@ export function createRenderer(canvas, atlas) {
       g.fillStyle = left < 0.25 ? '#e2432c' : '#f58a1f';
       g.fillRect(b.x + 2, b.y + 14, Math.max(1, Math.round(14 * left)), 1);
     }
+    // 친구가 물어 온 선물: 머리 위 말풍선. 친구를 누르면 받는다.
+    for (const p of w.pets) {
+      if (p.gift) bubble(PAD + p.x * TILE + 8, WALL_H + (p.y + 1) * TILE - 15 - (Math.floor(time * 3) % 2), 'gift');
+    }
     for (const f of w.floats) {
       const px = PAD + f.x * TILE + 8, py = WALL_H + f.y * TILE - 6 - f.t * 12;
       g.globalAlpha = f.t > 0.9 ? Math.max(0, (1.2 - f.t) / 0.3) : 1;
@@ -470,13 +476,13 @@ export function createRenderer(canvas, atlas) {
   const floorURL = id => floors[id].toDataURL();
   const wallURL = id => makeCanvas(16, 16, c => c.drawImage(walls[id], 0, 0)).toDataURL();
 
-  // 화면 밖(버튼, 옷장)에 쓸 동물 그림. worn을 주면 그 옷차림으로, face면 얼굴 쪽만 잘라서.
+  // 화면 밖(버튼, 옷장)에 쓸 동물 그림. worn을 주면 그 옷차림으로, headOnly면 얼굴 쪽만 잘라서.
   const petURLs = new Map();
-  function petURL(species, worn = {}, face = false) {
-    const key = [species, worn.hat, worn.neck, worn.body, face].join('|');
+  function petURL(species, worn = {}, headOnly = false) {
+    const key = [species, worn.hat, worn.face, worn.neck, worn.body, worn.back, headOnly].join('|');
     if (!petURLs.has(key)) {
       const full = makeCanvas(16, 14 + HAT_ROOM, c => petAt(c, 0, HAT_ROOM, species, 'a', worn));
-      petURLs.set(key, (face ? makeCanvas(11, 14, c => c.drawImage(full, -5, 0)) : full).toDataURL());
+      petURLs.set(key, (headOnly ? makeCanvas(11, 14, c => c.drawImage(full, -5, 0)) : full).toDataURL());
     }
     return petURLs.get(key);
   }

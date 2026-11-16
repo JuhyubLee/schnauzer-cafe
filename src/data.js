@@ -43,6 +43,7 @@ export const FURN_GROUPS = { seat: '테이블·의자', kitchen: '주방', deco:
 // group: 위의 분류, block: 지나갈 수 없음, charm: 분위기 점수(손님이 더 자주 오고 팁을 준다)
 // table: 옆에 스툴을 붙이면 손님 자리가 되는 가구, light: 밤에 둘레를 밝히는 빛의 색
 // season: 계절 한정(SEASONS의 이름), blink: 번갈아 보여 줄 두 번째 그림
+// stamps: 코인으로는 못 사고 도장 가게에서 이만큼의 도장으로 받는 것(price가 없다)
 export const FURN = {
   stool: { name: '주황 스툴', sprite: 'stool', group: 'seat', price: 25, lv: 1, block: true },
   table: { name: '원목 테이블', sprite: 'table', group: 'seat', price: 60, lv: 1, block: true, table: true },
@@ -53,11 +54,16 @@ export const FURN = {
   plant: { name: '초록 화분', sprite: 'plant', group: 'deco', price: 40, lv: 1, block: true, charm: 2 },
   flower: { name: '주황 꽃 화분', sprite: 'flower', group: 'deco', price: 70, lv: 3, block: true, charm: 3 },
   shelf: { name: '책장', sprite: 'shelf', group: 'deco', price: 180, lv: 5, block: true, charm: 5 },
+  aquarium: { name: '수족관', sprite: 'aquarium', blink: 'aquarium_b', group: 'deco', price: 1500, lv: 6, block: true, charm: 8 },
+  fountain: { name: '분수', sprite: 'fountain', blink: 'fountain_b', group: 'deco', price: 4000, lv: 10, block: true, charm: 12 },
+  musicbox: { name: '오르골', sprite: 'musicbox', blink: 'musicbox_b', group: 'deco', stamps: 15, lv: 1, block: true, charm: 8 },
+  trophy: { name: '단골 트로피', sprite: 'trophy', group: 'deco', stamps: 25, lv: 1, block: true, charm: 10 },
   candle: { name: '양초', sprite: 'candle', group: 'light', price: 50, lv: 1, block: true, charm: 1, light: '#ffc46e' },
   lantern: { name: '랜턴', sprite: 'lantern', group: 'light', price: 90, lv: 2, block: true, charm: 2, light: '#ffd76e' },
   lamp_mush: { name: '버섯 무드등', sprite: 'lamp_mush', group: 'light', price: 150, lv: 3, block: true, charm: 3, light: '#ff9c8c' },
   lamp: { name: '스탠드 조명', sprite: 'lamp', group: 'light', price: 120, lv: 4, block: true, charm: 4, light: '#ffba6e' },
   lamp_mint: { name: '민트 스탠드 조명', sprite: 'lamp_mint', group: 'light', price: 200, lv: 6, block: true, charm: 4, light: '#9bdccb' },
+  fireplace: { name: '벽난로', sprite: 'fireplace', blink: 'fireplace_b', group: 'light', price: 2500, lv: 8, block: true, charm: 10, light: '#ff9a4c' },
   rug: { name: '주황 러그', sprite: 'rug', group: 'mat', price: 30, lv: 2, block: false, charm: 1 },
   dogbed: { name: '폭신 방석', sprite: 'dogbed', group: 'mat', price: 90, lv: 2, block: false, charm: 2 },
   xmas_tree: { name: '크리스마스 트리', sprite: 'xmas_tree', blink: 'xmas_tree_b', group: 'season', season: 'xmas', price: 300, lv: 1, block: true, charm: 6, light: '#ffd76e' },
@@ -70,25 +76,63 @@ export const FURN = {
 
 // 동물 친구. id는 sprites.js의 PET_PAL과 같아야 한다.
 // hatDy: 머리 높이가 달라서 모자를 몇 줄 내려(+) 또는 올려(-) 씌울지. nick: 이름을 안 지었을 때 쓰는 이름
+// fav: 좋아하는 간식(TREATS의 이름). 주면 친밀도가 두 배로 오른다.
 export const PETS = {
-  schnauzer: { name: '슈나우저', hatDy: 0, nick: '슈슈' },
-  maltese: { name: '말티즈', hatDy: 0, nick: '몽이' },
-  shiba: { name: '시바견', hatDy: 1, nick: '콩이' },
-  poodle: { name: '푸들', hatDy: -1, nick: '초코' },
-  cheese: { name: '치즈 고양이', hatDy: 1, nick: '치즈' },
-  tuxedo: { name: '턱시도 고양이', hatDy: 1, nick: '턱시' },
-  graycat: { name: '회색 고양이', hatDy: 1, nick: '구름' },
+  schnauzer: { name: '슈나우저', hatDy: 0, nick: '슈슈', fav: 'jerky' },
+  maltese: { name: '말티즈', hatDy: 0, nick: '몽이', fav: 'cake' },
+  shiba: { name: '시바견', hatDy: 1, nick: '콩이', fav: 'biscuit' },
+  poodle: { name: '푸들', hatDy: -1, nick: '초코', fav: 'cake' },
+  cheese: { name: '치즈 고양이', hatDy: 1, nick: '치즈', fav: 'jerky' },
+  tuxedo: { name: '턱시도 고양이', hatDy: 1, nick: '턱시', fav: 'biscuit' },
+  graycat: { name: '회색 고양이', hatDy: 1, nick: '구름', fav: 'cake' },
 };
 // n번째 친구를 데려오는 조건 (첫 친구는 가게를 열 때 고른다)
 export const PET_SLOTS = [{ lv: 1, price: 0 }, { lv: 4, price: 600 }, { lv: 8, price: 2500 }];
 export const PET_NAME_MAX = 6;
+
+// 친밀도 단계. 친밀도(love)가 이 값 이상이면 그 단계다. perk는 그 단계부터 생기는 일(game.js가 실제로 한다).
+export const BONDS = [
+  { love: 0, name: '서먹서먹' },
+  { love: 15, name: '친구', perk: '손님을 반겨서, 손님이 주문을 더 오래 기다려 줘요' },
+  { love: 50, name: '단짝', perk: '가끔 작은 선물을 물어 와요' },
+  { love: 120, name: '가족', perk: '쓰다듬으면 두 배로 오래 신나요' },
+  { love: 300, name: '영혼의 단짝', perk: '평소에도 더 빨리 서빙해요' },
+];
+export const bondOf = love => {
+  let stage = 0;
+  while (stage + 1 < BONDS.length && love >= BONDS[stage + 1].love) stage++;
+  return stage;
+};
+
+// 간식. 코인으로 사서 바로 준다. love: 오르는 친밀도(좋아하는 간식이면 두 배).
+export const TREATS = {
+  biscuit: { name: '바삭 과자', icon: 't_biscuit', price: 30, love: 2 },
+  jerky: { name: '쫀득 육포', icon: 't_jerky', price: 90, love: 6 },
+  cake: { name: '미니 케이크', icon: 't_cake', price: 250, love: 16 },
+};
+export const TREATS_PER_DAY = 3; // 친구 한 마리가 하루에 먹는 간식 수
+
+// 오늘의 주문: 날마다 이 가운데 DAILY_COUNT가지가 온다. 목표 수는 base + perLv × 레벨.
+// 하나 끝낼 때마다 도장 1개, 그날 것을 다 끝내면 1개 더.
+export const DAILY = {
+  sell: { text: n => `음식 ${n}그릇 팔기`, base: 15, perLv: 3 },
+  cook: { text: n => `요리 ${n}번 하기`, base: 3, perLv: 0.5 },
+  serve: { text: n => `손님에게 직접 ${n}번 가져다주기`, base: 8, perLv: 1 },
+  pet: { text: n => `친구 ${n}번 쓰다듬기`, base: 5, perLv: 0 },
+  treat: { text: n => `친구에게 간식 ${n}번 주기`, base: 1, perLv: 0 },
+  earn: { text: n => `코인 ${n}개 벌기`, base: 150, perLv: 50 },
+};
+export const DAILY_COUNT = 3;
+
+// 오늘 날짜를 저장에 적는 글. 날짜가 바뀌었는지 볼 때 쓴다(기기 시계 기준).
+export const dayKey = (d = new Date()) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 
 // 놀러 가기: 친구 가게를 구경하고 오면 받는 코인. 가게마다 하루 한 번, 하루에 GIFTS_PER_DAY번까지.
 export const VISIT_GIFT = 30;
 export const GIFTS_PER_DAY = 3;
 
 // 앱 정보. 버전은 스토어에 올릴 때마다 올린다(android/app/build.gradle, ios 프로젝트와 같이).
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.3.0';
 // 웹 버전이 있는 주소. 초대장 링크와 개인정보 처리방침이 여기에 있다. 바꾸면 이미 보낸 초대장이 안 열린다.
 export const SITE_URL = 'https://juhyublee.github.io/schnauzer-cafe/';
 export const PRIVACY_URL = `${SITE_URL}privacy.html`;
@@ -97,13 +141,17 @@ export const SERVER_URL = 'https://pvqzntzwcuymnizcxkxz.supabase.co';
 export const SERVER_KEY = 'sb_publishable_OTD7C59V_E078KTx5ITbeg_joyFOWdS';
 
 // 옷. slot마다 하나씩 입는다. 그림은 sprites.js의 wear_<id>.
-export const WEAR_SLOTS = { hat: '모자', neck: '목', body: '옷' };
+// season: 계절 한정, stamps: 도장 가게에서만 받는 것(FURN과 같다)
+export const WEAR_SLOTS = { hat: '모자', face: '얼굴', neck: '목', body: '옷', back: '등' };
 export const WEAR = {
   hat_ribbon: { name: '주황 리본', slot: 'hat', price: 80 },
   hat_chef: { name: '요리사 모자', slot: 'hat', price: 150 },
   hat_straw: { name: '밀짚모자', slot: 'hat', price: 200 },
   hat_beret: { name: '빨간 베레모', slot: 'hat', price: 250 },
   hat_crown: { name: '왕관', slot: 'hat', price: 800 },
+  hat_flower: { name: '꽃 화관', slot: 'hat', stamps: 5 },
+  face_glasses: { name: '동그란 안경', slot: 'face', price: 150 },
+  face_sun: { name: '선글라스', slot: 'face', price: 300 },
   neck_scarf: { name: '주황 스카프', slot: 'neck', price: 60 },
   neck_bow: { name: '나비넥타이', slot: 'neck', price: 120 },
   neck_bell: { name: '방울 목걸이', slot: 'neck', price: 180 },
@@ -111,6 +159,9 @@ export const WEAR = {
   body_stripe: { name: '줄무늬 티', slot: 'body', price: 150 },
   body_sweater: { name: '분홍 스웨터', slot: 'body', price: 250 },
   body_raincoat: { name: '노란 우비', slot: 'body', price: 300 },
+  back_bag: { name: '빨간 책가방', slot: 'back', price: 200 },
+  back_balloon: { name: '빨간 풍선', slot: 'back', price: 250 },
+  back_wings: { name: '천사 날개', slot: 'back', stamps: 10 },
   hat_santa: { name: '산타 모자', slot: 'hat', price: 200, season: 'xmas' },
   hat_antler: { name: '루돌프 머리띠', slot: 'hat', price: 180, season: 'xmas' },
   body_santa: { name: '산타 옷', slot: 'body', price: 300, season: 'xmas' },

@@ -2,10 +2,11 @@
 import {
   RECIPES, RECIPE, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FURN_GROUPS, FLOORS, WALLS,
   PETS, PET_SLOTS, PET_NAME_MAX, WEAR, START_ROWS, START_COLS, START_DOOR, EXPANSIONS, WIDENINGS, EXPAND_DIRS,
-  STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, levelOf, stoveLimit, onSale,
+  STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, TREATS, TREATS_PER_DAY, levelOf, stoveLimit, onSale, bondOf, dayKey,
 } from './data.js';
 import { CUSTOMER_LOOKS, validIcon } from './sprites.js';
 import { mirror } from './device.js';
+import { bump } from './daily.js';
 
 // 가게 크기는 저장에 있다: state.rows(세로 줄 수), state.cols(가로 칸 수). 칸 번호는 y * cols + x.
 // 문은 윗벽의 state.door 칸 위에 있고, 그 아래 칸 (door, 0)은 손님이 드나드는 길이다.
@@ -24,7 +25,7 @@ export const G = { state: null, world: null, edit: null, visit: null, home: null
 
 const listeners = {};
 export const on = (evt, fn) => { (listeners[evt] ||= []).push(fn); };
-const emit = (evt, data) => { for (const fn of listeners[evt] || []) fn(data); };
+export const emit = (evt, data) => { for (const fn of listeners[evt] || []) fn(data); };
 const fail = msg => { emit('toast', msg); return false; };
 const rand = n => Math.floor(Math.random() * n);
 
@@ -49,6 +50,7 @@ function freshState() {
     tut: 0, sound: true, music: true, dim: true,
     photo: null,
     share: false, // 가게 모습을 서버에 올려 최신 모습을 보여 줄지. 가게 번호(sid)와 열쇠(skey)는 visit.js가 처음 쓸 때 채운다
+    stamps: 0, daily: null, // 도장 수와 오늘의 주문(daily.js)
     stats: { sold: 0, cooked: 0 },
   };
 }
@@ -73,6 +75,8 @@ function upgrade(s) {
   s.cols ??= START_COLS;
   s.door ??= START_DOOR;
   s.share ??= false;
+  s.stamps ??= 0;
+  s.daily ??= null;
   delete s.lastSeen; // 자리를 비운 동안 팔던 때 쓰던 값
   return s;
 }
@@ -92,6 +96,7 @@ function syncPets() {
     return {
       id: pet.id, x: pos.x, y: pos.y, path: [], state: 'idle', t: 1.5 + i * 0.7,
       dir: 1, up: false, walk: 0, boost: 0, target: null, think: i * 0.15, petCd: 0,
+      gift: 0, giftT: 90 + Math.random() * 120, // 물어 온 선물(코인 수)과 다음 선물까지 남은 시간(초)
     };
   });
 }
@@ -184,6 +189,7 @@ function usable(s) {
     && Array.isArray(s.closet) && s.closet.every(id => has(WEAR, id))
     && Array.isArray(s.custom) && s.custom.length <= MAX_CUSTOM && s.custom.every(c => obj(c)
       && /^c\d+$/.test(c.id) && typeof c.name === 'string' && has(CUSTOM_TIERS, c.tier) && validIcon(c.px))
+    && int(s.stamps) && s.stamps >= 0 && (s.daily === null || obj(s.daily))
     && Array.isArray(s.pets) && s.pets.length >= 1 && s.pets.length <= PET_SLOTS.length && s.pets.every(p => obj(p)
       && int(p.id) && has(PETS, p.species) && typeof p.name === 'string' && int(p.love) && obj(p.wear)
       && Object.entries(p.wear).every(([slot, id]) => has(WEAR, id) && WEAR[id].slot === slot))
@@ -405,6 +411,8 @@ function pay(c) {
   const tip = Math.random() < Math.min(0.6, charm() * 0.03) ? Math.max(1, Math.round(r.price * 0.25)) : 0;
   s.coins += r.price + tip;
   s.stats.sold++;
+  bump('sell', 1);
+  bump('earn', r.price + tip);
   // 서빙 안내는 세 그릇 팔 때까지 보여 준다. (친구가 먼저 서빙해도 읽을 시간이 있게)
   if (s.tut === 2 && s.stats.sold >= 3) s.tut = 3;
   G.world.floats.push({ kind: 'coin', n: r.price + tip, x: c.x, y: c.y, t: 0 });
@@ -412,7 +420,8 @@ function pay(c) {
   addXp(1);
 }
 
-export function serve(c) {
+// byHand: 플레이어가 손님을 직접 눌러서 가져다준 경우(친구가 한 서빙과 구분한다)
+export function serve(c, byHand = false) {
   const s = G.state;
   if (c.state !== 'wait') return false;
   if (!(s.stock[c.order] > 0)) return fail(`${recipeOf(c.order).name} 재고가 없어요`);
@@ -420,6 +429,7 @@ export function serve(c) {
   c.state = 'eat';
   c.t = EAT_TIME;
   G.world.floats.push({ kind: 'heart', x: c.x, y: c.y - 0.6, t: 0 });
+  if (byHand) bump('serve', 1);
   emit('serve');
   return true;
 }
@@ -441,7 +451,7 @@ function updateCustomers(dt) {
         const have = inStock();
         if (have.length) c.order = have[rand(have.length)].id;
       }
-      if (c.t > PATIENCE) leave(c);
+      if (c.t > patience()) leave(c);
     } else if (c.state === 'eat') {
       c.t -= dt;
       if (c.t <= 0) { pay(c); leave(c); }
@@ -451,15 +461,24 @@ function updateCustomers(dt) {
   }
   w.customers = w.customers.filter(c => c.state !== 'gone');
 }
-export const patienceLeft = c => 1 - c.t / PATIENCE;
+// 손님이 기다려 주는 시간. '친구' 단계 이상인 동물 친구 한 마리마다 15%씩 길어진다.
+const patience = () => PATIENCE * (1 + 0.15 * G.state.pets.filter(p => bondOf(p.love) >= 1).length);
+export const patienceLeft = c => 1 - c.t / patience();
 
 // ───── 동물 친구 ─────
+// 친밀도 단계(data.js의 BONDS)마다 생기는 일: 1 손님이 더 기다려 줌, 2 선물을 물어 옴, 3 신나는 시간 두 배, 4 서빙이 빨라짐
 
 function updatePet(p, dt) {
   const w = G.world, s = G.state;
+  const bond = bondOf(petById(p.id).love);
   p.boost = Math.max(0, p.boost - dt);
   p.petCd = Math.max(0, p.petCd - dt);
-  const speed = PET_SPEED * (p.boost > 0 ? 1.6 : 1);
+  const speed = PET_SPEED * (p.boost > 0 ? 1.6 : 1) * (bond >= 4 ? 1.15 : 1);
+  // 물어 온 선물은 받아 갈 때까지 머리 위에 떠 있다. 구경 중인 가게에서는 생기지 않는다.
+  if (!G.visit && !p.gift && bond >= 2 && (p.giftT -= dt) <= 0) {
+    p.gift = 5 + rand(6) + level();
+    p.giftT = 240 + Math.random() * 180;
+  }
 
   if (p.state === 'serve') {
     const c = w.customers.find(c => c.id === p.target);
@@ -509,16 +528,54 @@ function updatePet(p, dt) {
   else { p.state = 'idle'; p.t = 1; }
 }
 
-// 쓰다듬기
+function addLove(pet, n) {
+  const before = bondOf(pet.love);
+  pet.love += n;
+  if (!G.visit && bondOf(pet.love) > before) emit('bond', { pet, stage: bondOf(pet.love) });
+}
+
+// 쓰다듬기. 물어 온 선물이 있으면 받는다.
 export function petPet(id) {
   const p = G.world.pets.find(p => p.id === id);
   if (!p || p.petCd > 0) return;
+  const pet = petById(id);
   p.petCd = 0.8;
-  p.boost = PET_BOOST_TIME;
-  petById(id).love++;
+  if (p.gift) {
+    G.state.coins += p.gift;
+    G.world.floats.push({ kind: 'coin', n: p.gift, x: p.x, y: p.y - 0.4, t: 0 });
+    emit('gift', { pet, coins: p.gift });
+    p.gift = 0;
+  }
+  // 신나 있는 동안 또 쓰다듬어도 친밀도는 오르지 않는다(연달아 눌러서 채우지 못하게).
+  if (p.boost <= 0) addLove(pet, 1);
+  p.boost = PET_BOOST_TIME * (bondOf(pet.love) >= 3 ? 2 : 1);
   if (p.state === 'nap') { p.state = 'idle'; p.t = 1; }
   G.world.floats.push({ kind: 'heart', x: p.x, y: p.y - 0.4, t: 0 });
+  bump('pet', 1);
   emit('pet');
+}
+
+// 오늘 이 친구에게 준 간식 수
+export const fedToday = pet => (pet.fed?.day === dayKey() ? pet.fed.n : 0);
+
+// 간식을 사서 바로 준다. 친구마다 하루 TREATS_PER_DAY개까지. 좋아하는 간식이면 친밀도가 두 배로 오른다.
+export function feed(petId, treatId) {
+  const s = G.state, pet = petById(petId), treat = TREATS[treatId];
+  if (fedToday(pet) >= TREATS_PER_DAY) return fail(`${josa(pet.name, '은', '는')} 오늘 배가 불러요. 내일 또 주세요`);
+  if (s.coins < treat.price) return fail('코인이 모자라요');
+  s.coins -= treat.price;
+  pet.fed = { day: dayKey(), n: fedToday(pet) + 1 };
+  const fav = PETS[pet.species].fav === treatId;
+  emit('feed', { pet, fav }); // 단계가 오르면 그 소식이 뒤이어 나온다
+  addLove(pet, treat.love * (fav ? 2 : 1));
+  const p = G.world.pets.find(p => p.id === petId);
+  if (p) {
+    p.boost = PET_BOOST_TIME * (bondOf(pet.love) >= 3 ? 2 : 1);
+    if (p.state === 'nap') { p.state = 'idle'; p.t = 1; }
+    for (let i = 0; i <= (fav ? 1 : 0); i++) G.world.floats.push({ kind: 'heart', x: p.x + i * 0.5, y: p.y - 0.4 - i * 0.3, t: -i * 0.15 });
+  }
+  bump('treat', 1);
+  return true;
 }
 
 // 다음 친구를 데려오는 조건. 더 데려올 수 없으면 null.
@@ -555,6 +612,7 @@ export function setSpecies(id, species) {
 export function wear(petId, itemId) {
   const s = G.state, pet = petById(petId), item = WEAR[itemId];
   if (!s.closet.includes(itemId)) {
+    if (item.stamps) return fail('도장 가게에서 받을 수 있어요');
     if (!onSale(item)) return fail('지금은 팔지 않는 계절 한정 옷이에요');
     if (s.coins < item.price) return fail('코인이 모자라요');
     s.coins -= item.price;
@@ -578,6 +636,7 @@ export function startCook(stoveId, recipeId) {
   const now = Date.now();
   st.cook = { r: r.id, start: now, end: now + r.time * STOVE_SPEED[st.lv - 1] * 1000 };
   if (s.tut === 0) s.tut = 1;
+  bump('cook', 1);
   emit('cook');
   return true;
 }
@@ -786,6 +845,7 @@ export function askPlace(type, x, y) {
   const s = G.state;
   if (s.inv[type] > 0) return place(type, x, y);
   const err = placeError(type, x, y) || stoveLimitError(type)
+    || (FURN[type].stamps ? '도장 가게에서 받을 수 있어요' : null)
     || (!onSale(FURN[type]) ? '지금은 팔지 않는 계절 한정 가구예요' : null)
     || (s.coins < FURN[type].price ? '코인이 모자라요' : null);
   if (err) return fail(err);

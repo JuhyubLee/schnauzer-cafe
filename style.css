@@ -313,6 +313,10 @@ textarea { resize: none; }
 }
 .list li span { flex: 1; min-width: 0; word-break: break-word; -webkit-user-select: text; user-select: text; }
 .list li img { width: 32px; height: 32px; flex: none; object-fit: contain; }
+/* 오늘의 주문: 끝낸 주문에만 도장이 또렷하게 찍힌다 */
+.goals li img { opacity: 0.25; }
+.goals li.done img { opacity: 1; }
+.goals li.done span { color: var(--muted); text-decoration: line-through; }
 hr { border: 0; border-top: var(--edge); margin: 12px 0; }
 .license {
   margin: 0;

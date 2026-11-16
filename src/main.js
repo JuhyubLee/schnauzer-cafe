@@ -67,13 +67,13 @@ function playTap(p) {
     const d = Math.hypot(p.x - (x + 8), p.y - (y - 6));
     if (d < bestD) { best = c; bestD = d; }
   }
-  if (best) { serve(best); return; }
+  if (best) { serve(best, true); return; }
 
-  // 동물 친구: 겹쳐 있으면 누른 곳에 가까운 쪽을 쓰다듬는다.
+  // 동물 친구: 겹쳐 있으면 누른 곳에 가까운 쪽을 쓰다듬는다. 선물을 물고 있으면 말풍선까지 눌린다.
   let pet = null, petD = Infinity;
   for (const q of w.pets) {
-    const x = PAD + q.x * TILE, y = WALL_H + q.y * TILE;
-    if (!inRect(p, x - 3, y - 6, TILE + 6, TILE + 8)) continue;
+    const x = PAD + q.x * TILE, y = WALL_H + q.y * TILE, up = q.gift ? 22 : 6;
+    if (!inRect(p, x - 3, y - up, TILE + 6, TILE + up + 2)) continue;
     const d = Math.hypot(p.x - (x + 8), p.y - (y + 8));
     if (d < petD) { pet = q; petD = d; }
   }

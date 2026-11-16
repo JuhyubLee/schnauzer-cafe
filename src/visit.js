@@ -72,7 +72,8 @@ export function makeSnapshot() {
     w: s.wall,
     f: s.floor,
     i: s.items.map(it => (it.type === 'stove' ? [it.type, it.x, it.y, it.lv] : [it.type, it.x, it.y])),
-    p: s.pets.map(p => [p.species, p.name, p.wear.hat || '', p.wear.neck || '', p.wear.body || '']),
+    // 얼굴과 등은 1.3.0부터 붙는다. 그 전 초대장에는 없다.
+    p: s.pets.map(p => [p.species, p.name, p.wear.hat || '', p.wear.neck || '', p.wear.body || '', p.wear.face || '', p.wear.back || '']),
     c: s.custom.map(c => [c.name, c.tier, c.px.join('')]),
   };
 }
@@ -136,11 +137,11 @@ function sanitize(raw) {
   const pets = [];
   for (const p of raw.p) {
     if (!Array.isArray(p)) return null;
-    const [species, petName, hat, neck, body] = p;
-    const worn = { hat, neck, body };
+    const [species, petName, hat, neck, body, face = '', back = ''] = p;
+    const worn = { hat, neck, body, face, back };
     if (!has(PETS, species) || !str(petName, PET_NAME_MAX)) return null;
     for (const [slot, id] of Object.entries(worn)) if (id !== '' && !(has(WEAR, id) && WEAR[id].slot === slot)) return null;
-    pets.push([species, str(petName, PET_NAME_MAX), hat, neck, body]);
+    pets.push([species, str(petName, PET_NAME_MAX), hat, neck, body, face, back]);
   }
 
   if (!Array.isArray(raw.c) || raw.c.length > MAX_CUSTOM) return null;
@@ -219,16 +220,15 @@ function shopFrom(snap) {
     nextId: snap.i.length + 1,
     floor: [...snap.f], wall: snap.w, walls: [snap.w],
     inv: {}, stock,
-    pets: snap.p.map(([species, name, hat, neck, body], i) => {
+    pets: snap.p.map(([species, name, hat, neck, body, face, back], i) => {
       const wear = {};
-      if (hat) wear.hat = hat;
-      if (neck) wear.neck = neck;
-      if (body) wear.body = body;
+      for (const [slot, id] of Object.entries({ hat, neck, body, face, back })) if (id) wear[slot] = id;
       return { id: i + 1, species, name, love: 0, wear };
     }),
     nextPet: snap.p.length + 1, closet: [],
     custom, nextCustom: custom.length + 1,
     notes: [], tut: 4, sound: home.sound, music: home.music,
+    stamps: 0, daily: null,
     stats: { sold: 0, cooked: 0 },
   };
 }

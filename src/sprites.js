@@ -256,6 +256,111 @@ def('candle', [
   '................',
 ]);
 
+// ───── 값비싼 가구: 그림 두 장을 번갈아 보여서 움직인다 ─────
+
+const AQUARIUM = fish => [
+  '................',
+  '..llllllllllll..',
+  '..uuuuuuuuuuuu..',
+  ...fish,
+  '..unnuuuuuuunu..',
+  '..CCCCCCCCCCCC..',
+  '..BBBBBBBBBBBB..',
+  '..B..........B..',
+  '..B..........B..',
+  '................',
+];
+def('aquarium', AQUARIUM([
+  '..uouoouuuuuwu..',
+  '..uuooouuyyuyu..',
+  '..uouoouuyyyuu..',
+  '..uuuuuuuyyuyu..',
+  '..unuuuuuuuuuu..',
+]));
+def('aquarium_b', AQUARIUM([
+  '..uuouoouyyuyu..',
+  '..uuuooouyyyuu..',
+  '..uuouoouyyuyu..',
+  '..uuuuuuuuuwuu..',
+  '..unuuuuuuuuuu..',
+]));
+
+const FIREPLACE = flames => [
+  '................',
+  '.bbbbbbbbbbbbbb.',
+  '.BBBBBBBBBBBBBB.',
+  '..rrRrrrrRrrrr..',
+  '..rRrrrRrrrrRr..',
+  '..rrKKKKKKKKrr..',
+  '..RrKKKKKKKKrR..',
+  ...flames,
+  '..rrKBBBBBBKrr..',
+  '..CCCCCCCCCCCC..',
+  '................',
+];
+def('fireplace', FIREPLACE([
+  '..rrKKKyKKKKrr..',
+  '..rRKKyoyKKKRr..',
+  '..rrKKoyoyKKrr..',
+  '..RrKyoooyoKrR..',
+]));
+def('fireplace_b', FIREPLACE([
+  '..rrKKKKyKKKrr..',
+  '..rRKKoyoKKKRr..',
+  '..rrKKyoyoKKrr..',
+  '..RrKoyoooyKrR..',
+]));
+
+const FOUNTAIN = (spray, pool) => [
+  '................',
+  ...spray,
+  '.......ll.......',
+  '.....llllll.....',
+  '....luuuuuul....',
+  '.....gllllg.....',
+  '.......ll.......',
+  '.......ll.......',
+  '..llllllllllll..',
+  '..luuuuuuuuuul..',
+  pool,
+  '..gllllllllllg..',
+  '...gggggggggg...',
+  '................',
+];
+def('fountain', FOUNTAIN(['.......ww.......', '......wuuw......', '.....w.uu.w.....'], '..luuwuuuuwuul..'));
+def('fountain_b', FOUNTAIN(['.......uu.......', '.....wuuuuw.....', '....w..uu..w....'], '..luuuuwuuuuul..'));
+
+// 도장 가게에서만 받는 가구
+const MUSICBOX = dancer => [
+  '................',
+  ...dancer,
+  '...tttttttttt...',
+  '...tTTTTTTTTt...',
+  '...tTyTTTTyTt...',
+  '...tTTTTTTTTt...',
+  '...ttttttttttyy.',
+  '...BBBBBBBBBB...',
+  '................',
+];
+def('musicbox', MUSICBOX(['.......p........', '......ppp.......', '.......w........']));
+def('musicbox_b', MUSICBOX(['........p.......', '.......ppp......', '........w.......']));
+
+def('trophy', [
+  '................',
+  '....yyyyyyyy....',
+  '..y.yyyyyyyy.y..',
+  '..y.yyywyyyy.y..',
+  '...yyyywyyyyy...',
+  '.....yyyyyy.....',
+  '......yyyy......',
+  '.......YY.......',
+  '.......YY.......',
+  '.....YYYYYY.....',
+  '....BBBBBBBB....',
+  '....BBBBBBBB....',
+  '................',
+]);
+
 def('shelf', [
   'kkkkkkkkkkkkkkkk',
   'kbbbbbbbbbbbbbbk',
@@ -666,6 +771,13 @@ hat('hat_antler', [
   '.........b.b....',
   '........rrrrr...',
 ]);
+hat('hat_flower', [
+  '................',
+  '................',
+  '................',
+  '........p...p...',
+  '.......pypnpyp..',
+]);
 
 // 목과 옷: 동물 그림의 0~10번 줄과 그대로 겹친다. 몸 안쪽에만 칠하므로 바깥선은 없다.
 const EMPTY = '................';
@@ -707,6 +819,25 @@ onBody('body_santa', [
   '.rrrrrr.........',
   '.kkykkk.........',
   '.wwwwwwww.......',
+]);
+
+// 얼굴: 눈은 모든 종이 5번 줄의 8번, 12번 칸에 있다. 안경은 눈 둘레에 테를 두르고, 선글라스는 눈을 덮는다.
+onBody('face_glasses', ['........Y...Y...', '.......Y.YYY.Y..', '........Y...Y...', EMPTY, EMPTY, EMPTY, EMPTY]);
+onBody('face_sun', ['.......UKKKUKK..', '.......KKK.KKK..', EMPTY, EMPTY, EMPTY, EMPTY]);
+
+// 등: 몸 위쪽(1~6번 칸)에 얹는다. 머리(7번 칸부터)는 되도록 가리지 않는다.
+// 어떤 털 색 위에서도 보이게 바깥선을 두른다(목, 옷과 다른 점).
+const onBack = (name, rows) => def(`wear_${name}`, [...rows, ...Array(11 - rows.length).fill(EMPTY)]);
+onBack('back_bag', [EMPTY, EMPTY, EMPTY, EMPTY, '..rrr...........', '..ryr...........', '..rRr...........']);
+onBack('back_wings', [EMPTY, EMPTY, EMPTY, '..ww.ww.........', '.wwwwwww........', '..wwlww.........', '...w.w..........']);
+onBack('back_balloon', [
+  EMPTY,
+  '..rr............',
+  '.rwrr...........',
+  '.rrrr...........',
+  '..rr............',
+  '...w............',
+  '...w............',
 ]);
 
 // 가게 얼굴(첫 화면, 액자, 앱 아이콘)에 쓰는 정면 슈나우저
@@ -1075,6 +1206,57 @@ def('arrow_right', [
   '................',
   '................',
   '................',
+]);
+
+// ───── 도장, 간식 ─────
+
+def('stamp', [
+  '................',
+  '.....rrrrrr.....',
+  '...rrrrrrrrrr...',
+  '..rrrwwrrwwrrr..',
+  '..rrrwwrrwwrrr..',
+  '.rrrrrrrrrrrrrr.',
+  '.rrrrrwwwwrrrrr.',
+  '.rrrrwwwwwwrrrr.',
+  '.rrrrwwwwwwrrrr.',
+  '..rrrrwwwwrrrr..',
+  '..rrrrrrrrrrrr..',
+  '...rrrrrrrrrr...',
+  '.....rrrrrr.....',
+  '................',
+]);
+
+const BLANK = n => Array(n).fill('................');
+def('t_biscuit', [
+  ...BLANK(5),
+  '...tt......tt...',
+  '..tttttttttttt..',
+  '..tttTttttTttt..',
+  '..tttttttttttt..',
+  '...tt......tt...',
+  ...BLANK(6),
+]);
+def('t_jerky', [
+  ...BLANK(5),
+  '....RRRRRRR.....',
+  '...RrRRRrRRR....',
+  '...RRRrRRRrRR...',
+  '....RRrRRRRRR...',
+  '.....RRRRRRR....',
+  ...BLANK(6),
+]);
+def('t_cake', [
+  ...BLANK(3),
+  '.......r........',
+  '......rrr.......',
+  '....wwwwwwww....',
+  '....wpwwpwwp....',
+  '....pppppppp....',
+  '....cccccccc....',
+  '....cCccCccc....',
+  '...llllllllll...',
+  ...BLANK(5),
 ]);
 
 // ───── 나만의 메뉴 아이콘 ─────

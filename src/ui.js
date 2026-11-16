@@ -1,12 +1,12 @@
 // 캔버스 밖의 화면: 위쪽 정보, 아래 버튼, 꾸미기 패널, 올라오는 창.
-// 친구(옷장)와 나만의 메뉴 화면은 ui-pet.js, ui-menu.js에 있다.
+// 친구(옷장), 나만의 메뉴, 주문 화면은 ui-pet.js, ui-menu.js, ui-daily.js에 있다.
 import {
-  G, on, level, hint, charm, seatCount, stoves, cookState, itemById, recipeOf, allRecipes,
+  G, on, level, hint, charm, seatCount, stoves, cookState, itemById, recipeOf, allRecipes, josa,
   startCook, collect, costOf, enterEdit, exitEdit, storeItem, upgradeCost, expandCfg,
   askWall, askExpand, askUpgrade, pendingInfo, confirmPending, save, reset, startGame, exportSave, importSave,
 } from './game.js';
 import {
-  FURN, FURN_GROUPS, FLOORS, WALLS, SEASONS, EXPAND_DIRS, LEVEL_XP, PETS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL,
+  FURN, FURN_GROUPS, FLOORS, WALLS, SEASONS, EXPAND_DIRS, LEVEL_XP, PETS, BONDS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL,
   stoveLimit, fmtTime, onSale,
 } from './data.js';
 import { $, esc, setText, setHTML, setSrc, copyText } from './dom.js';
@@ -17,6 +17,8 @@ import { createPetUI } from './ui-pet.js';
 import { createMenuUI } from './ui-menu.js';
 import { createVisitUI } from './ui-visit.js';
 import { createPhotoUI } from './ui-photo.js';
+import { createDailyUI } from './ui-daily.js';
+import { goalText } from './daily.js';
 import { sharing, stopSharing } from './visit.js';
 
 export function initUI({ atlas, renderer }) {
@@ -26,17 +28,27 @@ export function initUI({ atlas, renderer }) {
   const petFace = pet => renderer.petURL(pet.species, pet.wear, true);
 
   $('coinIcon').src = icon('coin');
-  const navIcons = { cook: 'f_tteok', edit: 'hammer', visit: 'door', notes: 'note' };
+  const navIcons = { cook: 'f_tteok', edit: 'hammer', visit: 'door', daily: 'stamp' };
   for (const [nav, name] of Object.entries(navIcons)) document.querySelector(`[data-nav="${nav}"] img`).src = icon(name);
 
   // ── 알림 ──
+  // toast: 바로 보여 주고 앞의 것을 덮는다. news: 좋은 소식(단계가 오름, 주문을 끝냄)이라 겹쳐도 하나씩 차례로 보여 준다.
   let toastTimer = 0;
-  function toast(msg) {
+  const newsQueue = [];
+  function show(msg, ms) {
     const el = $('toast');
     el.textContent = msg;
     el.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+    toastTimer = setTimeout(() => {
+      el.classList.remove('show');
+      if (newsQueue.length) show(newsQueue.shift(), 2600);
+    }, ms);
+  }
+  const toast = msg => show(msg, 1800);
+  function news(msg) {
+    if ($('toast').classList.contains('show')) newsQueue.push(msg);
+    else show(msg, 2600);
   }
 
   // ── 올라오는 창 ──
@@ -74,6 +86,7 @@ export function initUI({ atlas, renderer }) {
   const menuUI = createMenuUI(kit);
   const visitUI = createVisitUI(kit);
   const photoUI = createPhotoUI({ ...kit, onChange: () => renderEdit() });
+  const dailyUI = createDailyUI(kit);
 
   // ── 요리 ──
   function openCook(stoveId = null) {
@@ -189,6 +202,7 @@ export function initUI({ atlas, renderer }) {
         <hr>
         <button type="button" class="btn danger" data-act="reset">처음부터 다시 하기</button>
         <hr>
+        <button type="button" class="btn" data-act="notes">의견 적어 두기</button>
         <div class="pair">
           <button type="button" class="btn" data-act="privacy">개인정보 처리방침</button>
           <button type="button" class="btn" data-act="licenses">글꼴 라이선스</button>
@@ -235,6 +249,7 @@ export function initUI({ atlas, renderer }) {
           reset();
           location.reload();
         },
+        notes() { sfx('tap'); openNotes(); },
         privacy() { window.open(PRIVACY_URL, '_blank', 'noopener'); },
         async licenses() {
           let text = '';
@@ -289,8 +304,10 @@ export function initUI({ atlas, renderer }) {
         const locked = f.lv > lv, have = s.inv[id] || 0;
         const full = id === 'stove' && stoves().length >= stoveLimit(lv);
         const off = !have && !onSale(f); // 계절이 아니면 새로 살 수 없다. 보관해 둔 것은 놓을 수 있다.
-        const sub = off ? `${SEASONS[f.season].name} 한정` : locked ? `Lv ${f.lv}` : have ? `보관 ${have}개` : full ? '지금은 최대' : coin(f.price);
-        return `<button type="button" class="card ${e.place === id ? 'on' : ''}" data-act="furn" data-id="${id}" ${locked || full || off ? 'disabled' : ''}>
+        const stampOnly = !have && f.stamps; // 도장 가게에서 받아야 놓을 수 있다
+        const sub = off ? `${SEASONS[f.season].name} 한정` : locked ? `Lv ${f.lv}` : have ? `보관 ${have}개`
+          : stampOnly ? `도장 ${f.stamps}개` : full ? '지금은 최대' : coin(f.price);
+        return `<button type="button" class="card ${e.place === id ? 'on' : ''}" data-act="furn" data-id="${id}" ${locked || full || off || stampOnly ? 'disabled' : ''}>
           <img class="px" src="${icon(f.sprite)}" alt=""><b>${f.name}</b><small>${sub}</small></button>`;
       }).join('');
     }
@@ -421,6 +438,7 @@ export function initUI({ atlas, renderer }) {
       setSrc($('petIcon'), petFace(first));
       setSrc($('shopIcon'), petFace(first));
     }
+    setText($('dailyLabel'), dailyUI.label());
     const h = s.started ? hint() : '';
     $('hint').hidden = !h;
     setText($('hint'), h);
@@ -432,7 +450,7 @@ export function initUI({ atlas, renderer }) {
     const btn = ev.target.closest('[data-nav]');
     if (!btn) return;
     sfx('tap');
-    ({ cook: openCook, edit: openEdit, pet: () => petUI.openPets(), visit: visitUI.openNeighbors, notes: openNotes })[btn.dataset.nav]();
+    ({ cook: openCook, edit: openEdit, pet: () => petUI.openPets(), visit: visitUI.openNeighbors, daily: () => dailyUI.openDaily() })[btn.dataset.nav]();
   });
   $('shopBtn').addEventListener('click', () => { sfx('tap'); openSettings(); });
 
@@ -472,6 +490,19 @@ export function initUI({ atlas, renderer }) {
   on('serve', () => sfx('serve'));
   on('collect', r => { sfx('done'); toast(`${r.name} ${r.n}그릇을 진열했어요`); });
   on('pet', () => sfx('bark'));
+  on('feed', ({ pet, fav }) => {
+    sfx('bark');
+    toast(fav ? `${josa(pet.name, '이', '가')} 제일 좋아하는 간식이에요!` : `${josa(pet.name, '이', '가')} 맛있게 먹었어요`);
+  });
+  on('gift', ({ pet, coins }) => { sfx('coin'); toast(`${josa(pet.name, '이', '가')} 선물을 물어 왔어요! 코인 ${coins}개`); });
+  on('bond', ({ pet, stage }) => {
+    sfx('level');
+    news(`${josa(pet.name, '과', '와')} '${BONDS[stage].name}' 사이가 됐어요! 이제 ${BONDS[stage].perk}`);
+  });
+  on('daily', ({ goal, all }) => {
+    sfx('done');
+    news(all ? `오늘의 주문을 다 끝냈어요! 도장 2개를 받았어요` : `주문 완료: ${goalText(goal)}. 도장 1개를 받았어요`);
+  });
   on('place', () => sfx('place'));
   on('levelup', showLevelUp);
   on('custom', id => { delete icons[`custom_${id}`]; });
