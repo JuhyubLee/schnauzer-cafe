@@ -1,6 +1,6 @@
 // 골목 화면: 내 가게들을 보고 옮겨 다니고, 조건이 되면 새 가게를 연다. 문을 누르거나 가게 설정에서 연다.
 import { G, shopOfType, shopNo, openError, openShop, switchShop, furnOf, josa, managerOf, awaySales } from './game.js';
-import { SHOP_TYPES, SHOP_NAME_MAX, REGULAR_EVERY, levelOf } from './data.js';
+import { SHOP_TYPES, SHOP_NAME_MAX, levelOf } from './data.js';
 import { $, esc } from './dom.js';
 import { sfx } from './sfx.js';
 
@@ -18,7 +18,7 @@ export function createAlleyUI({ icon, coin, toast, news, openSheet, closeSheet, 
           <span class="meta"><b>${no}호점 ${esc(shop.shopName)}</b>
             <small>${cfg.name} · Lv ${levelOf(shop.xp)} · ${coin(shop.coins)}</small>
             <small>${cfg.trait}</small>
-            ${cfg.stay ? `<small>단골 ${shop.regulars || 0}명 · ${REGULAR_EVERY}명마다 감사 선물</small>` : ''}
+            ${cfg.stay ? `<small>단골 ${shop.regulars || 0}명</small>` : ''}
             ${ready ? `<small>다 된 것 ${ready}개</small>` : ''}
             ${manager ? `<small>점장 ${esc(manager.name)}</small>` : ''}
             ${sold ? `<small>그동안 ${sold.n}번 팔았어요</small>` : ''}</span>
