@@ -1,6 +1,6 @@
 // 나만의 메뉴 만들기: 이름과 등급을 정하고, 16×16 아이콘을 직접 그린다.
 import { G, level, saveCustom, deleteCustom, save } from './game.js';
-import { CUSTOM_TIERS, CUSTOM_NAME_MAX, fmtTime } from './data.js';
+import { CUSTOM_TIERS, CUSTOM_NAME_MAX, SHOP_TYPES, fmtTime } from './data.js';
 import { PAL, ICON_COLORS, ICON_SIZE, ICON_TEMPLATES, setSprite } from './sprites.js';
 import { $, esc } from './dom.js';
 import { sfx } from './sfx.js';
@@ -21,13 +21,13 @@ export function createMenuUI({ toast, openSheet }) {
     let color = 'r';
     const undo = [];
     const scratch = {}; // 미리보기를 그릴 임시 그림판
-    const lv = level();
+    const lv = level(), { unit } = SHOP_TYPES[G.state.type];
 
     const tiers = Object.entries(CUSTOM_TIERS).map(([tid, t]) => {
       const locked = t.lv > lv;
       return `<button type="button" class="card" data-act="tier" data-id="${tid}" ${locked ? 'disabled' : ''}>
         <b>${t.name}</b>${locked ? `<small>Lv ${t.lv}</small>`
-    : `<small>${fmtTime(t.time)} · ${t.n}그릇</small><small>재료 ${t.cost}</small><small>그릇당 ${t.price}</small>`}</button>`;
+    : `<small>${fmtTime(t.time)} · ${t.n}${unit}</small><small>재료 ${t.cost}</small><small>${unit}당 ${t.price}</small>`}</button>`;
     }).join('');
     const swatches = `<button type="button" class="swatch eraser" data-act="color" data-c="${ERASER}" aria-label="지우개"></button>`
       + ICON_COLORS.map(c => `<button type="button" class="swatch" data-act="color" data-c="${c}" style="background:${PAL[c]}" aria-label="${COLOR_NAMES[c]}"></button>`).join('');

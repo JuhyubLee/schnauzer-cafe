@@ -25,6 +25,16 @@ export const RECIPES = [
   { id: 'cheesecake', name: '치즈 케이크', icon: 'f_cheesecake', lv: 6, cost: 220, time: 1800, n: 12, price: 42, xp: 70, shop: 'cafe' },
   { id: 'tiramisu', name: '티라미수', icon: 'f_tiramisu', lv: 7, cost: 300, time: 3600, n: 14, price: 50, xp: 110, shop: 'cafe' },
   { id: 'shortcake', name: '딸기 생크림 케이크', icon: 'f_shortcake', lv: 8, cost: 420, time: 10800, n: 16, price: 64, xp: 200, shop: 'cafe' },
+  { id: 'socks', name: '양말', icon: 'f_socks', lv: 1, cost: 8, time: 15, n: 4, price: 5, xp: 3, shop: 'clothes' },
+  { id: 'hanky', name: '손수건', icon: 'f_hanky', lv: 1, cost: 20, time: 40, n: 5, price: 9, xp: 5, shop: 'clothes' },
+  { id: 'tshirt', name: '티셔츠', icon: 'f_tshirt', lv: 2, cost: 55, time: 120, n: 8, price: 15, xp: 12, shop: 'clothes' },
+  { id: 'cap', name: '야구 모자', icon: 'f_cap', lv: 2, cost: 12, time: 30, n: 6, price: 5, xp: 4, shop: 'clothes' },
+  { id: 'totebag', name: '에코백', icon: 'f_totebag', lv: 3, cost: 90, time: 300, n: 8, price: 24, xp: 22, shop: 'clothes' },
+  { id: 'vest', name: '니트 조끼', icon: 'f_vest', lv: 4, cost: 70, time: 480, n: 6, price: 28, xp: 26, shop: 'clothes' },
+  { id: 'jeans', name: '청바지', icon: 'f_jeans', lv: 5, cost: 160, time: 900, n: 10, price: 36, xp: 45, shop: 'clothes' },
+  { id: 'dress', name: '원피스', icon: 'f_dress', lv: 6, cost: 220, time: 1800, n: 12, price: 42, xp: 70, shop: 'clothes' },
+  { id: 'coat', name: '코트', icon: 'f_coat', lv: 7, cost: 300, time: 3600, n: 14, price: 50, xp: 110, shop: 'clothes' },
+  { id: 'hanbok', name: '한복', icon: 'f_hanbok', lv: 8, cost: 420, time: 10800, n: 16, price: 64, xp: 200, shop: 'clothes' },
 ];
 export const RECIPE = Object.fromEntries(RECIPES.map(r => [r.id, r]));
 
@@ -97,6 +107,12 @@ export const FURN = {
   showcase: { name: '케이크 진열장', sprite: 'showcase', group: 'deco', price: 400, lv: 3, block: true, charm: 6, shop: 'cafe' },
   neon: { name: '네온 간판', sprite: 'neon', blink: 'neon_b', group: 'light', price: 600, lv: 5, block: true, charm: 6, light: '#ff9ad2', shop: 'cafe' },
   piano: { name: '피아노', sprite: 'piano', group: 'deco', price: 3000, lv: 8, block: true, charm: 12, shop: 'cafe' },
+  // 옷가게(3호점). rack: 손님이 그 옆에 서서 물건을 고르는 가구(옷가게에서는 이것이 손님 자리다)
+  rack: { name: '옷걸이', sprite: 'rack', group: 'seat', price: 60, lv: 1, block: true, rack: true, shop: 'clothes' },
+  rack_gold: { name: '금빛 옷걸이', sprite: 'rack_gold', group: 'seat', price: 200, lv: 5, block: true, rack: true, charm: 2, shop: 'clothes' },
+  mirror: { name: '전신 거울', sprite: 'mirror', group: 'deco', price: 150, lv: 2, block: true, charm: 3, shop: 'clothes' },
+  mannequin: { name: '마네킹', sprite: 'mannequin', group: 'deco', price: 300, lv: 3, block: true, charm: 5, shop: 'clothes' },
+  fitting: { name: '탈의실', sprite: 'fitting', group: 'deco', price: 800, lv: 4, block: true, charm: 8, shop: 'clothes' },
 };
 
 // 동물 친구. id는 sprites.js의 PET_PAL과 같아야 한다.
@@ -111,8 +127,11 @@ export const PETS = {
   tuxedo: { name: '턱시도 고양이', hatDy: 1, nick: '턱시', fav: 'biscuit', cat: true },
   graycat: { name: '회색 고양이', hatDy: 1, nick: '구름', fav: 'cake', cat: true },
 };
-// n번째 친구를 데려오는 조건 (첫 친구는 가게를 열 때 고른다)
-export const PET_SLOTS = [{ lv: 1, price: 0 }, { lv: 4, price: 600 }, { lv: 8, price: 2500 }];
+// n번째 친구를 데려오는 조건 (첫 친구는 가게를 열 때 고른다). 레벨은 내 가게들 가운데 가장 높은 레벨을 본다.
+export const PET_SLOTS = [{ lv: 1, price: 0 }, { lv: 4, price: 600 }, { lv: 8, price: 2500 }, { lv: 12, price: 6000 }, { lv: 12, price: 12000 }];
+// 점장: 친구를 한 가게에 두면, 내가 다른 가게에 있는 동안(게임이 켜져 있을 때) 그 가게에 진열된 것을 천천히 판다.
+// 직접 장사할 때 손님이 오는 속도에 이 값을 곱한 속도로 판다. 친밀도 단계마다 하나씩이다(BONDS와 같은 순서).
+export const MANAGER_RATE = [0.15, 0.2, 0.25, 0.3, 0.35];
 export const PET_NAME_MAX = 6;
 
 // 친밀도 단계. 친밀도(love)가 이 값 이상이면 그 단계다. perk는 그 단계부터 생기는 일(game.js가 실제로 한다).
@@ -140,8 +159,8 @@ export const TREATS_PER_DAY = 3; // 친구 한 마리가 하루에 먹는 간식
 // 오늘의 주문: 날마다 이 가운데 DAILY_COUNT가지가 온다. 목표 수는 base + perLv × 레벨.
 // 하나 끝낼 때마다 도장 1개, 그날 것을 다 끝내면 1개 더.
 export const DAILY = {
-  sell: { text: n => `음식 ${n}그릇 팔기`, base: 15, perLv: 3 },
-  cook: { text: n => `요리 ${n}번 하기`, base: 3, perLv: 0.5 },
+  sell: { text: n => `손님에게 ${n}번 팔기`, base: 15, perLv: 3 },
+  cook: { text: n => `${n}번 만들기`, base: 3, perLv: 0.5 },
   serve: { text: n => `손님에게 직접 ${n}번 가져다주기`, base: 8, perLv: 1 },
   pet: { text: n => `친구 ${n}번 쓰다듬기`, base: 5, perLv: 0 },
   treat: { text: n => `친구에게 간식 ${n}번 주기`, base: 1, perLv: 0 },
@@ -204,6 +223,7 @@ export const FLOORS = {
   check: { name: '주황 체크', price: 4, lv: 2 },
   mint: { name: '민트 타일', price: 5, lv: 4 },
   parquet: { name: '쪽마루 바닥', price: 6, lv: 2, shop: 'cafe' },
+  carpet: { name: '와인색 카펫', price: 6, lv: 2, shop: 'clothes' },
 };
 
 export const WALLS = {
@@ -218,6 +238,7 @@ export const WALLS = {
   navy: { name: '남색 별무늬', price: 900, lv: 9 },
   gold: { name: '금빛 별무늬', price: 1500, lv: 12 },
   sage: { name: '세이지 줄무늬', price: 400, lv: 3, shop: 'cafe' },
+  lilac: { name: '연보라 줄무늬', price: 400, lv: 3, shop: 'clothes' },
 };
 
 // 벽 액자에 거는 사진의 크기(픽셀). 고른 사진을 이 크기로 줄여서 저장한다.
@@ -227,11 +248,14 @@ export const PHOTO_MAX_CHARS = 12000;
 
 // 가게 종류. 적은 순서가 1호점, 2호점이다. 저장의 맨 위에는 언제나 첫 가게(FIRST_SHOP)를 둔다. 예전 버전이 그 모양만 읽을 수 있어서다.
 // 다른 가게의 값은 저장의 others에 들어간다(game.js의 '가게 여러 개').
-// icon: 골목 화면에서 가게를 나타내는 그림, maker: 요리하는 기구의 이름과 그림(요리 중 그림은 이름 뒤에 _on)
+// icon: 골목 화면에서 가게를 나타내는 그림, maker: 만드는 기구의 이름과 그림(만드는 중 그림은 이름 뒤에 _on)
+// make: 만드는 일을 부르는 말, unit: 물건을 세는 말
+// stand: 손님이 앉지 않고 옷걸이(rack) 옆에 서서 고르는 가게. 처음에 테이블 대신 옷걸이가 놓인다.
 // opens: 여는 조건. after 가게가 lv 레벨이 되면 그 가게의 지갑에서 price를 내고 연다.
 export const SHOP_TYPES = {
-  bunsik: { name: '분식', icon: 'f_tteok', maker: { name: '화구', sprite: 'stove' } },
-  cafe: { name: '카페', icon: 'f_latte', maker: { name: '커피 머신', sprite: 'espresso' }, opens: { after: 'bunsik', lv: 12, price: 15000 } },
+  bunsik: { name: '분식', icon: 'f_tteok', make: '요리', unit: '그릇', maker: { name: '화구', sprite: 'stove' } },
+  cafe: { name: '카페', icon: 'f_latte', make: '요리', unit: '개', maker: { name: '커피 머신', sprite: 'espresso' }, opens: { after: 'bunsik', lv: 12, price: 15000 } },
+  clothes: { name: '옷가게', icon: 'f_tshirt', make: '만들기', unit: '벌', stand: true, maker: { name: '재봉틀', sprite: 'sewing' }, opens: { after: 'cafe', lv: 12, price: 20000 } },
 };
 export const FIRST_SHOP = 'bunsik';
 // 메뉴·가구·바닥·벽지가 딸린 가게

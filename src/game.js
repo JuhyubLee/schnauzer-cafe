@@ -3,7 +3,7 @@ import {
   RECIPE, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FURN_GROUPS, FLOORS, WALLS,
   PETS, PET_SLOTS, PET_NAME_MAX, WEAR, START_ROWS, START_COLS, START_DOOR, EXPANSIONS, WIDENINGS, EXPAND_DIRS,
   STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, TREATS, TREATS_PER_DAY, SHOP_TYPES, FIRST_SHOP, SHOP_RECIPES, SHOP_NAME_MAX,
-  levelOf, stoveLimit, onSale, bondOf, dayKey, shopOf, furnIn,
+  MANAGER_RATE, levelOf, stoveLimit, onSale, bondOf, dayKey, shopOf, furnIn,
 } from './data.js';
 import { CUSTOMER_LOOKS, validIcon } from './sprites.js';
 import { mirror } from './device.js';
@@ -31,7 +31,7 @@ export const emit = (evt, data) => { for (const fn of listeners[evt] || []) fn(d
 const fail = msg => { emit('toast', msg); return false; };
 const rand = n => Math.floor(Math.random() * n);
 
-// 새 가게 하나의 값(아래 SHOP_FIELDS): 요리 기구 하나, 화분, 테이블 두 벌, 100코인.
+// 새 가게 하나의 값(아래 SHOP_FIELDS): 만드는 기구 하나, 화분, 손님 자리(테이블 두 벌이나 옷걸이 둘), 100코인.
 function freshShop(type, shopName) {
   let id = 1;
   const it = (kind, x, y, extra) => ({ id: id++, type: kind, x, y, ...extra });
@@ -40,8 +40,9 @@ function freshShop(type, shopName) {
     coins: 100, xp: 0, rows: START_ROWS, cols: START_COLS, door: START_DOOR,
     items: [
       it('stove', 1, 0, { lv: 1, cook: null }), it('plant', 0, 0),
-      it('table', 2, 2), it('stool', 1, 2), it('stool', 3, 2),
-      it('table', 5, 4), it('stool', 4, 4), it('stool', 6, 4),
+      ...(SHOP_TYPES[type].stand
+        ? [it('rack', 2, 2), it('rack', 5, 4)]
+        : [it('table', 2, 2), it('stool', 1, 2), it('stool', 3, 2), it('table', 5, 4), it('stool', 4, 4), it('stool', 6, 4)]),
     ],
     nextId: id,
     floor: Array(START_ROWS * START_COLS).fill('wood'),
@@ -92,6 +93,8 @@ function upgrade(s) {
   s.song ??= 'auto';
   s.type ??= FIRST_SHOP;
   s.others = Array.isArray(s.others) ? s.others.filter(o => o && typeof o === 'object') : [];
+  // 점장으로 가 있던 가게가 저장에 없으면 데려온다
+  for (const p of s.pets) if (p.post !== undefined && p.post !== s.type && !s.others.some(o => o.type === p.post)) delete p.post;
   delete s.lastSeen; // 자리를 비운 동안 팔던 때 쓰던 값
   return s;
 }
@@ -101,10 +104,13 @@ function freshWorld() {
   syncPets();
 }
 
-// 저장된 친구마다 가게 안을 돌아다니는 몸을 하나씩 둔다.
+// 지금 가게에 있는 친구인지. 점장으로 한 가게를 맡은 친구(pet.post)는 그 가게에만 있고, 나머지는 나를 따라다닌다.
+export const isHere = pet => !pet.post || pet.post === G.state.type;
+
+// 지금 가게에 있는 친구마다 가게 안을 돌아다니는 몸을 하나씩 둔다.
 function syncPets() {
   const w = G.world;
-  w.pets = G.state.pets.map((pet, i) => {
+  w.pets = G.state.pets.filter(isHere).map((pet, i) => {
     const old = w.pets.find(p => p.id === pet.id);
     if (old) return old;
     const pos = nearestFree(4 - i, 1);
@@ -261,6 +267,7 @@ function usable(s) {
     && int(s.stamps) && s.stamps >= 0 && (s.daily === null || obj(s.daily))
     && Array.isArray(s.pets) && s.pets.length >= 1 && s.pets.length <= PET_SLOTS.length && s.pets.every(p => obj(p)
       && int(p.id) && has(PETS, p.species) && typeof p.name === 'string' && int(p.love) && obj(p.wear)
+      && (p.post === undefined || typeof p.post === 'string')
       && Object.entries(p.wear).every(([slot, id]) => has(WEAR, id) && WEAR[id].slot === slot));
 }
 
@@ -321,11 +328,14 @@ export const furnOf = id => furnIn(G.state.type, id);
 export const itemAt = (x, y) => G.state.items.find(i => i.x === x && i.y === y);
 export const itemById = id => G.state.items.find(i => i.id === id);
 export const petById = id => G.state.pets.find(p => p.id === id);
-export const charm = () => G.state.items.reduce((sum, i) => sum + (FURN[i.type].charm || 0), 0);
+const charmOf = shop => shop.items.reduce((sum, i) => sum + (FURN[i.type].charm || 0), 0);
+export const charm = () => charmOf(G.state);
 export const stoves = () => G.state.items.filter(i => i.type === 'stove');
 export const cookState = st => (!st.cook ? 'idle' : Date.now() >= st.cook.end ? 'done' : 'cooking');
 const inBounds = (x, y) => x >= 0 && y >= 0 && x < cols() && y < G.state.rows;
-const spawnInterval = () => Math.max(3.5, 9 - charm() * 0.2);
+// 손님이 오는 간격(초). 분위기가 좋을수록 짧다.
+const paceOf = shop => Math.max(3.5, 9 - charmOf(shop) * 0.2);
+const spawnInterval = () => paceOf(G.state);
 
 // 메뉴: 기본 메뉴와 나만의 메뉴를 같은 모양으로 다룬다.
 let customCache = null; // 나만의 메뉴 id → 메뉴. 고칠 때마다 비운다.
@@ -433,16 +443,34 @@ function nearestFree(x, y) {
   return best || { x, y };
 }
 
-// 테이블 옆에 붙은 스툴만 자리로 친다.
-function seats() {
+// 손님 자리. 음식을 파는 가게는 테이블 옆에 붙은 스툴이고, 서서 고르는 가게(stand)는 옷걸이 옆의 빈 칸이다(옷걸이마다 한 명).
+// { id, x, y: 손님이 있는 칸, tx, ty: 테이블이나 옷걸이가 있는 칸, stand: 서 있는 자리인지 }
+const STAND_DIRS = [[0, 1], [-1, 0], [1, 0], [0, -1]]; // 앞(아래), 옆, 뒤 순서로 빈 칸을 찾는다
+function seatsOf(s) {
+  const at = (x, y) => s.items.find(i => i.x === x && i.y === y);
   const out = [];
-  for (const st of G.state.items) {
+  if (SHOP_TYPES[s.type].stand) {
+    const taken = new Set();
+    for (const rack of s.items) {
+      if (!FURN[rack.type].rack) continue;
+      const d = STAND_DIRS.find(([dx, dy]) => {
+        const x = rack.x + dx, y = rack.y + dy;
+        return x >= 0 && y >= 0 && x < s.cols && y < s.rows && !taken.has(y * s.cols + x) && !FURN[at(x, y)?.type]?.block;
+      });
+      if (!d) continue;
+      taken.add((rack.y + d[1]) * s.cols + rack.x + d[0]);
+      out.push({ id: rack.id, x: rack.x + d[0], y: rack.y + d[1], tx: rack.x, ty: rack.y, stand: true });
+    }
+    return out;
+  }
+  for (const st of s.items) {
     if (st.type !== 'stool') continue;
-    const d = DIRS.find(([dx, dy]) => FURN[itemAt(st.x + dx, st.y + dy)?.type]?.table);
+    const d = DIRS.find(([dx, dy]) => FURN[at(st.x + dx, st.y + dy)?.type]?.table);
     if (d) out.push({ id: st.id, x: st.x, y: st.y, tx: st.x + d[0], ty: st.y + d[1] });
   }
   return out;
 }
+const seats = () => seatsOf(G.state);
 export const seatCount = () => seats().length;
 
 // 경로를 따라 움직인다. 다 가면 true.
@@ -569,7 +597,8 @@ function updateCustomers(dt) {
       if (c.t > patience()) leave(c);
     } else if (c.state === 'eat') {
       c.t -= dt;
-      if (c.t <= 0) { pay(c); leave(c); }
+      // 서서 고르는 가게에서는 산 물건을 들고 나간다(bought).
+      if (c.t <= 0) { pay(c); c.bought = !!c.seat.stand; leave(c); }
     } else if (c.state === 'out') {
       if (stepAlong(c, WALK_SPEED, dt)) c.state = 'gone';
     }
@@ -577,7 +606,7 @@ function updateCustomers(dt) {
   w.customers = w.customers.filter(c => c.state !== 'gone');
 }
 // 손님이 기다려 주는 시간. '친구' 단계 이상인 동물 친구 한 마리마다 15%씩 길어진다.
-const patience = () => PATIENCE * (1 + 0.15 * G.state.pets.filter(p => bondOf(p.love) >= 1).length);
+const patience = () => PATIENCE * (1 + 0.15 * G.state.pets.filter(p => isHere(p) && bondOf(p.love) >= 1).length);
 export const patienceLeft = c => 1 - c.t / patience();
 
 // ───── 동물 친구 ─────
@@ -695,6 +724,8 @@ export const fedToday = pet => (pet.fed?.day === dayKey() ? pet.fed.n : 0);
 // 가게에 있는 친구가 간식을 받아먹고(TREAT_TIME), 다 먹으면 updatePet이 기뻐하는 모습을 보여 준다.
 export function feed(petId, treatId) {
   const s = G.state, pet = petById(petId), treat = TREATS[treatId];
+  const p = G.world.pets.find(p => p.id === petId);
+  if (!p) return fail(`${josa(pet.name, '은', '는')} 지금 다른 가게를 맡고 있어요. 그 가게에 가서 주세요`);
   if (fedToday(pet) >= TREATS_PER_DAY) return fail(`${josa(pet.name, '은', '는')} 오늘 배가 불러요. 내일 또 주세요`);
   if (s.coins < treat.price) return fail('코인이 모자라요');
   s.coins -= treat.price;
@@ -702,7 +733,6 @@ export function feed(petId, treatId) {
   const fav = PETS[pet.species].fav === treatId;
   emit('feed', { pet, fav }); // 단계가 오르면 그 소식이 뒤이어 나온다
   addLove(pet, treat.love * (fav ? 2 : 1));
-  const p = G.world.pets.find(p => p.id === petId);
   p.boost = PET_BOOST_TIME * (bondOf(pet.love) >= 3 ? 2 : 1);
   p.eat = { icon: treat.icon, t: TREAT_TIME, fav };
   if (p.state === 'nap') { p.state = 'idle'; p.t = 1; }
@@ -760,7 +790,7 @@ export function wear(petId, itemId) {
 
 export function startCook(stoveId, recipeId) {
   const s = G.state, st = itemById(stoveId), r = recipeOf(recipeId);
-  if (!st || st.cook) return fail(`이 ${josa(furnOf('stove').name, '은', '는')} 이미 요리 중이에요`);
+  if (!st || st.cook) return fail(`이 ${josa(furnOf('stove').name, '은', '는')} 이미 만드는 중이에요`);
   if (!r || (!r.custom && shopOf(r) !== s.type)) return fail('이 가게에서는 만들 수 없는 메뉴예요');
   if (r.lv > level()) return fail(`레벨 ${r.lv}에 열려요`);
   const cost = costOf(r);
@@ -811,7 +841,7 @@ export function saveCustom({ id, name, tier, px }) {
 
 export function deleteCustom(id) {
   const s = G.state, w = G.world;
-  if (stoves().some(st => st.cook?.r === id)) return fail('요리 중인 메뉴는 지울 수 없어요');
+  if (stoves().some(st => st.cook?.r === id)) return fail('만드는 중인 메뉴는 지울 수 없어요');
   // 이 메뉴를 먹던 손님은 계산하고, 기다리던 손님은 다른 메뉴를 고른다.
   for (const c of w.customers) if (c.order === id && c.state === 'eat') { pay(c); leave(c); }
   s.custom = s.custom.filter(c => c.id !== id);
@@ -854,7 +884,7 @@ export function exitEdit() {
 }
 
 // others에 있는 다른 가게로 옮긴다. 옮겼으면 true. 구경 중이거나 꾸미는 중에는 옮기지 않는다.
-// 먹던 손님은 떠나는 가게의 지갑으로 계산하고, 친구들은 따라온다.
+// 먹던 손님은 떠나는 가게의 지갑으로 계산한다. 따라다니는 친구들은 같이 오고, 점장은 맡은 가게에 남는다.
 export function switchShop(type) {
   const s = G.state;
   if (G.visit || G.edit || !has(SHOP_TYPES, type) || !s.others.some(o => o.type === type)) return false;
@@ -862,9 +892,14 @@ export function switchShop(type) {
   rotate(s, type);
   customCache = null;
   for (const c of s.custom) emit('custom', c.id); // 가게마다 나만의 메뉴 번호가 겹쳐서 그림을 다시 만든다
+  syncPets();
   settlePets();
   emit('resize');
   save();
+  // 내가 없는 동안 이 가게의 점장이 판 것을 알린다
+  const sold = away[type], pet = managerOf(type);
+  delete away[type];
+  if (sold?.n && pet) emit('manager', { pet, n: sold.n, coins: sold.coins });
   return true;
 }
 
@@ -1095,6 +1130,54 @@ export function confirmPending() {
   }
 }
 
+// ───── 점장 ─────
+// 친구를 한 가게의 점장으로 두면(pet.post = 가게 종류) 그 친구는 그 가게에만 있다.
+// 내가 다른 가게에 있는 동안, 게임이 켜져 있으면 점장이 그 가게에 진열된 것을 천천히 판다. 판 돈은 그 가게 지갑에 쌓인다.
+// 경험치와 오늘의 주문은 직접 장사할 때만 오른다. 요리를 꺼내거나 새로 올리지는 않는다.
+const away = {}; // 가게 종류 → { t: 다음에 팔 때까지 남은 시간(초), n: 내가 없는 동안 판 수, coins: 번 코인 }. 저장하지 않는다.
+export const managerOf = type => G.state.pets.find(p => p.post === type) || null;
+// 내가 없는 동안 그 가게의 점장이 판 것 { n, coins }. 판 것이 없으면 null.
+export const awaySales = type => (away[type]?.n ? away[type] : null);
+const managerPace = (shop, pet) => paceOf(shop) / MANAGER_RATE[bondOf(pet.love)];
+// 진열된 물건의 값. 나만의 메뉴는 그 가게의 것에서 찾는다.
+const priceIn = (shop, id) => (RECIPE[id] || CUSTOM_TIERS[shop.custom.find(c => c.id === id)?.tier])?.price;
+
+function runManagers(dt) {
+  for (const shop of G.state.others) {
+    const pet = has(SHOP_TYPES, shop.type) && managerOf(shop.type);
+    if (!pet) continue;
+    const a = (away[shop.type] ||= { t: managerPace(shop, pet), n: 0, coins: 0 });
+    if ((a.t -= dt) > 0) continue;
+    a.t = managerPace(shop, pet);
+    const have = Object.keys(shop.stock).filter(id => shop.stock[id] > 0 && priceIn(shop, id) > 0);
+    if (!have.length || !seatsOf(shop).length) continue; // 팔 것이 없거나 손님 자리가 없으면 못 판다
+    const id = have[rand(have.length)], price = priceIn(shop, id);
+    shop.stock[id]--;
+    shop.coins += price;
+    shop.stats.sold++;
+    a.n++;
+    a.coins += price;
+  }
+}
+
+// 친구를 가게의 점장으로 두거나(type), 다시 데리고 다닌다(type이 null). 바꿨으면 true.
+// 가게마다 점장은 한 마리이고, 데리고 다니는 친구가 적어도 한 마리는 남아야 한다.
+export function setPost(petId, type) {
+  const s = G.state, pet = petById(petId);
+  if (G.visit || G.edit || !pet) return false;
+  if (type) {
+    if (!shopOfType(type)) return fail('아직 없는 가게예요');
+    if (s.pets.some(p => p !== pet && p.post === type)) return fail('그 가게에는 이미 점장이 있어요');
+    if (!s.pets.some(p => p !== pet && !p.post)) return fail('데리고 다닐 친구가 한 마리는 있어야 해요');
+    pet.post = type;
+  } else {
+    delete pet.post;
+  }
+  for (const c of G.world.customers) if (c.claim === petId) c.claim = null;
+  syncPets();
+  return true;
+}
+
 // ───── 시간 ─────
 
 // 장사는 게임 화면이 켜져 있는 동안에만 한다. 화면을 끄면 이 함수가 불리지 않아서 손님도 판매도 멈춘다.
@@ -1104,6 +1187,7 @@ export function tick(dt) {
   w.time += dt;
   for (const f of w.floats) f.t += dt;
   w.floats = w.floats.filter(f => f.t < 1.2);
+  if (G.state.started && !G.visit) runManagers(dt);
   if (G.edit || !G.state.started) return;
   w.spawnT -= dt;
   if (w.spawnT <= 0) {

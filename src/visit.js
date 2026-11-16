@@ -2,7 +2,7 @@
 // 초대장은 가게 모습만 담은 글(코드)이고, 주소 뒤에 붙여 링크로 보낸다. 서버 없이도 읽힌다.
 // 코인, 재고, 의견, 액자 사진은 담지 않는다. 받은 초대장은 남이 만든 글이므로 하나하나 검사해서 쓴다.
 // '최신 모습 공유'를 켠 가게는 모습을 서버에도 올려 두어서, 놀러 올 때마다 그때의 모습을 보여 줄 수 있다.
-import { G, level, enterVisit, leaveVisit, save, MAX_ROWS, MAX_COLS } from './game.js';
+import { G, level, enterVisit, leaveVisit, save, isHere, MAX_ROWS, MAX_COLS } from './game.js';
 import { putShop, getShop, deleteShop, reportShop } from './cloud.js';
 import {
   CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FLOORS, WALLS, PETS, PET_SLOTS, PET_NAME_MAX,
@@ -61,7 +61,8 @@ export function makeSnapshot() {
     f: s.floor,
     i: s.items.map(it => (it.type === 'stove' ? [it.type, it.x, it.y, it.lv] : [it.type, it.x, it.y])),
     // 얼굴과 등은 1.3.0부터 붙는다. 그 전 초대장에는 없다.
-    p: s.pets.map(p => [p.species, p.name, p.wear.hat || '', p.wear.neck || '', p.wear.body || '', p.wear.face || '', p.wear.back || '']),
+    // 점장으로 다른 가게에 가 있는 친구는 이 가게 모습에 담지 않는다
+    p: s.pets.filter(isHere).map(p => [p.species, p.name, p.wear.hat || '', p.wear.neck || '', p.wear.body || '', p.wear.face || '', p.wear.back || '']),
     c: s.custom.map(c => [c.name, c.tier, c.px.join('')]),
   };
 }

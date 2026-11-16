@@ -30,9 +30,9 @@ export function initUI({ atlas, renderer }) {
   const petFace = pet => renderer.petURL(pet.species, pet.wear, true);
 
   $('coinIcon').src = icon('coin');
-  const navIcons = { edit: 'hammer', visit: 'door', daily: 'stamp' }; // 요리 버튼 그림은 가게마다 달라서 refresh가 넣는다
+  const navIcons = { edit: 'hammer', visit: 'door', daily: 'stamp' }; // 만들기 버튼의 그림과 글(요리, 만들기)은 가게마다 달라서 refresh가 넣는다
   for (const [nav, name] of Object.entries(navIcons)) document.querySelector(`[data-nav="${nav}"] img`).src = icon(name);
-  const cookIcon = document.querySelector('[data-nav="cook"] img');
+  const cookIcon = document.querySelector('[data-nav="cook"] img'), cookLabel = document.querySelector('[data-nav="cook"] span');
 
   // ── 알림 ──
   // toast: 바로 보여 주고 앞의 것을 덮는다. news: 좋은 소식(단계가 오름, 주문을 끝냄)이라 겹쳐도 하나씩 차례로 보여 준다.
@@ -93,7 +93,7 @@ export function initUI({ atlas, renderer }) {
   });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && sheetOpen()) closeSheet(); });
 
-  const kit = { icon, coin, toast, openSheet, closeSheet, renderer, refresh };
+  const kit = { icon, coin, toast, news, openSheet, closeSheet, renderer, refresh };
   const petUI = createPetUI(kit);
   const menuUI = createMenuUI(kit);
   const visitUI = createVisitUI(kit);
@@ -103,10 +103,10 @@ export function initUI({ atlas, renderer }) {
 
   // ── 요리 ──
   function openCook(stoveId = null) {
-    const lv = level(), s = G.state;
+    const lv = level(), s = G.state, { make, unit } = SHOP_TYPES[s.type]; // 요리·그릇, 만들기·벌처럼 가게마다 다른 말
     const rows = allRecipes().map(r => {
       const locked = r.lv > lv;
-      const info = locked ? `레벨 ${r.lv}에 열려요` : `${fmtTime(r.time)} · ${r.n}그릇 · 그릇당 ${r.price}`;
+      const info = locked ? `레벨 ${r.lv}에 열려요` : `${fmtTime(r.time)} · ${r.n}${unit} · ${unit}당 ${r.price}`;
       const row = `<button type="button" class="row" data-act="cook" data-r="${r.id}" ${locked ? 'disabled' : ''}>
         <img class="px" src="${icon(r.icon)}" alt="">
         <span class="meta"><b>${esc(r.name)}</b><small>${info}</small></span>
@@ -121,7 +121,7 @@ export function initUI({ atlas, renderer }) {
       ? `<button type="button" class="btn big" data-act="create">나만의 메뉴 만들기 (${s.custom.length}/${MAX_CUSTOM})</button>`
       : `<p class="muted center">나만의 메뉴를 ${MAX_CUSTOM}개 모두 만들었어요</p>`;
     const maker = furnOf('stove').name; // 화구, 커피 머신처럼 가게마다 다르다
-    openSheet('요리', `<div>${lines}</div>${rows}${add}`, {
+    openSheet(make, `<div>${lines}</div>${rows}${add}`, {
       live() {
         stoves().forEach((st, i) => {
           const el = document.querySelector(`[data-stove="${st.id}"]`);
@@ -143,7 +143,7 @@ export function initUI({ atlas, renderer }) {
         cook(el) {
           const picked = stoveId != null && itemById(stoveId);
           const target = picked && !picked.cook ? picked : stoves().find(st => !st.cook);
-          if (!target) { toast(`빈 ${josa(maker, '이', '가')} 없어요. 요리가 끝나길 기다려 주세요`); sfx('err'); return; }
+          if (!target) { toast(`빈 ${josa(maker, '이', '가')} 없어요. 다 될 때까지 기다려 주세요`); sfx('err'); return; }
           if (startCook(target.id, el.dataset.r)) { sfx('cook'); closeSheet(); }
         },
         collect(el) { collect(Number(el.dataset.id)); },
@@ -201,7 +201,7 @@ export function initUI({ atlas, renderer }) {
         <button type="button" class="btn big" data-act="alley">골목으로 나가기 (다른 가게)</button>
         <label class="field">가게 이름<input id="setShop" maxlength="12" value="${esc(s.shopName)}" autocomplete="off"></label>
         <button type="button" class="btn primary" data-act="name">이름 바꾸기</button>
-        <p class="muted">분위기 ${charm()} · 손님 자리 ${seatCount()}개 · 만든 요리 ${s.stats.cooked}번</p>
+        <p class="muted">분위기 ${charm()} · 손님 자리 ${seatCount()}개 · 만든 횟수 ${s.stats.cooked}번</p>
         <hr>
         <div class="pair">
           <button type="button" class="btn" data-act="music">${onOff('음악', s.music)}</button>
@@ -476,6 +476,7 @@ export function initUI({ atlas, renderer }) {
       setSrc($('shopIcon'), petFace(first));
     }
     setSrc(cookIcon, icon(SHOP_TYPES[s.type].icon));
+    setText(cookLabel, SHOP_TYPES[s.type].make);
     setText($('dailyLabel'), dailyUI.label());
     const h = s.started ? hint() : '';
     $('hint').hidden = !h;
@@ -527,7 +528,8 @@ export function initUI({ atlas, renderer }) {
   on('toast', msg => { toast(msg); sfx('err'); });
   on('sale', () => sfx('coin'));
   on('serve', () => sfx('serve'));
-  on('collect', r => { sfx('done'); toast(`${r.name} ${r.n}그릇을 진열했어요`); });
+  on('collect', r => { sfx('done'); toast(`${r.name} ${r.n}${josa(SHOP_TYPES[G.state.type].unit, '을', '를')} 진열했어요`); });
+  on('manager', ({ pet, n, coins }) => { sfx('coin'); news(`점장 ${josa(pet.name, '이', '가')} 그동안 ${n}번 팔아서 코인 ${coins}개를 벌어 놨어요`); });
   on('pet', pet => voice(pet.species));
   // 간식: 먼저 먹는 소리가 나고, 다 먹으면(cheer) 그 종의 목소리로 운다.
   on('feed', ({ pet, fav }) => {

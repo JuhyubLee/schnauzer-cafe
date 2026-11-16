@@ -63,6 +63,11 @@ const FLOOR_PAINT = {
     for (const [bx, by] of [[0, 0], [8, 8]]) for (const y of [3, 7]) g.fillRect(bx, by + y, 8, 1); // 가로로 놓인 널
     for (const [bx, by] of [[8, 0], [0, 8]]) for (const x of [3, 7]) g.fillRect(bx + x, by, 1, 8); // 세로로 놓인 널
   },
+  carpet(g) {
+    g.fillStyle = '#9c3848'; g.fillRect(0, 0, 16, 16);
+    g.fillStyle = '#b44a5c'; for (const [x, y] of [[3, 3], [11, 3], [7, 7], [3, 11], [11, 11], [15, 15]]) g.fillRect(x, y, 1, 1);
+    g.fillStyle = '#84303e'; g.fillRect(0, 15, 15, 1);
+  },
 };
 
 const WALL_PAINT = {
@@ -142,6 +147,10 @@ const WALL_PAINT = {
   sage(g, w, h) {
     g.fillStyle = '#d3e2cb'; g.fillRect(0, 0, w, h);
     g.fillStyle = '#b9cfae'; for (let x = 0; x < w; x += 8) g.fillRect(x, 0, 4, h);
+  },
+  lilac(g, w, h) {
+    g.fillStyle = '#e4d9f2'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#cfc0e8'; for (let x = 0; x < w; x += 8) g.fillRect(x, 0, 4, h);
   },
 };
 
@@ -372,10 +381,16 @@ export function createRenderer(canvas, atlas) {
   }
 
   function drawCustomer(c, time) {
-    const seated = c.state === 'wait' || c.state === 'eat';
-    const frame = seated ? 'sit' : Math.floor(c.walk * 6) % 2 ? 'a' : 'b';
+    const waiting = c.state === 'wait' || c.state === 'eat';
+    const seated = waiting && !c.seat.stand; // 서서 고르는 가게(옷가게)에서는 앉지 않는다
+    const frame = seated ? 'sit' : waiting ? 'b' : Math.floor(c.walk * 6) % 2 ? 'a' : 'b';
     const bob = c.state === 'eat' && Math.floor(time * 4) % 2 ? 1 : 0;
     sprOnTile(`cust${c.look}_${c.up ? 'back_' : ''}${frame}`, c.x, c.y, seated ? -5 + bob : 0);
+    // 서서 고르는 가게: 받은 것을 몸에 대 보고(eat), 산 것을 들고 나간다(bought)
+    if ((c.state === 'eat' && c.seat.stand) || (c.state === 'out' && c.bought)) {
+      const x = PAD + c.x * TILE + (c.dir > 0 ? 8 : -1), y = WALL_H + c.y * TILE + 4 - bob;
+      g.drawImage(miniOf(atlas[recipeOf(c.order).icon]), Math.round(x), Math.round(y));
+    }
   }
 
   // 동물 그림은 pet_<종>_<다리><꼬리><얼굴>이다(sprites.js). 꼬리는 신나 있거나 손님을 반길 때 흔들고, 얼굴은 기쁠 때 웃는다.
@@ -509,9 +524,9 @@ export function createRenderer(canvas, atlas) {
     }
     if (!G.edit) {
       for (const c of w.customers) {
-        const seated = c.state === 'wait' || c.state === 'eat';
+        const seated = (c.state === 'wait' || c.state === 'eat') && !c.seat.stand;
         list.push({ key: c.y + (seated ? 0.6 : 0.55), draw: () => drawCustomer(c, time) });
-        if (c.state === 'eat') {
+        if (c.state === 'eat' && !c.seat.stand) {
           const dx = (c.seat.x - c.seat.tx) * 4, dy = (c.seat.y - c.seat.ty) * 2;
           list.push({
             key: c.seat.ty + 0.7,

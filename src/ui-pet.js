@@ -1,6 +1,9 @@
-// 동물 친구 창: 쓰다듬기, 친밀도 단계, 간식, 옷장, 이름과 모습 바꾸기, 새 친구 데려오기.
-import { G, bestLevel, petById, petPet, feed, fedToday, wear, renamePet, setSpecies, adopt, adoptSlot, save } from './game.js';
-import { PETS, PET_NAME_MAX, WEAR, WEAR_SLOTS, SEASONS, BONDS, TREATS, TREATS_PER_DAY, bondOf, onSale } from './data.js';
+// 동물 친구 창: 쓰다듬기, 친밀도 단계, 점장 맡기기, 간식, 옷장, 이름과 모습 바꾸기, 새 친구 데려오기.
+import {
+  G, bestLevel, petById, petPet, feed, fedToday, wear, renamePet, setSpecies, adopt, adoptSlot, save,
+  setPost, isHere, shopOfType, shopNo, josa,
+} from './game.js';
+import { PETS, PET_NAME_MAX, WEAR, WEAR_SLOTS, SEASONS, BONDS, TREATS, TREATS_PER_DAY, SHOP_TYPES, bondOf, onSale } from './data.js';
 import { $, esc, setHTML } from './dom.js';
 import { sfx } from './sfx.js';
 
@@ -37,8 +40,20 @@ export function createPetUI({ icon, coin, toast, openSheet, closeSheet, renderer
 
     const chips = s.pets.map(p =>
       `<button type="button" class="chip ${p.id === pet.id ? 'on' : ''}" data-act="pick" data-id="${p.id}">
-        <img class="px" src="${renderer.petURL(p.species, p.wear, true)}" alt=""><span>${esc(p.name)}</span></button>`).join('')
+        <img class="px" src="${renderer.petURL(p.species, p.wear, true)}" alt=""><span>${esc(p.name)}${p.post ? ' · 점장' : ''}</span></button>`).join('')
       + (adoptSlot() ? '<button type="button" class="chip" data-act="adopt"><span>+ 새 친구</span></button>' : '');
+
+    // 점장: 가게가 둘 이상일 때만 보인다. 맡은 가게가 있으면 그만두기, 없으면 가게마다 맡기기 단추.
+    const awayNow = !isHere(pet); // 점장으로 다른 가게에 가 있어서 지금 가게에는 없다
+    const shops = Object.keys(SHOP_TYPES).filter(shopOfType);
+    const postShop = pet.post && shopOfType(pet.post);
+    const posts = shops.length < 2 ? '' : `<hr>
+      <p><b>점장</b></p>
+      <p class="muted">점장은 맡은 가게에 남아요. 내가 다른 가게에 있는 동안 그 가게에 진열된 것을 천천히 팔고, 친할수록 빨리 팔아요. 가게마다 한 마리이고, 데리고 다닐 친구가 한 마리는 있어야 해요.</p>
+      ${postShop
+    ? `<p>지금 <b>${shopNo(pet.post)}호점 ${esc(postShop.shopName)}</b>의 점장이에요</p>
+        <button type="button" class="btn" data-act="unpost">점장 그만두고 데리고 다니기</button>`
+    : shops.map(type => `<button type="button" class="btn" data-act="post" data-id="${type}">${shopNo(type)}호점 ${esc(shopOfType(type).shopName)} 점장 맡기기</button>`).join('')}`;
 
     const closet = Object.entries(WEAR_SLOTS).map(([slot, slotName]) => {
       const cards = Object.entries(WEAR).filter(([, w]) => w.slot === slot).map(([wid, w]) => {
@@ -69,6 +84,7 @@ export function createPetUI({ icon, coin, toast, openSheet, closeSheet, renderer
         <p class="muted">쓰다듬으면 창이 닫히고 가게에서 좋아하는 모습이 보여요. 신나서 한동안 더 빨리 서빙하고, 친밀도가 1 올라요. 신나 있는 동안에는 더 쓰다듬어도 오르지 않아요. 가게에서 직접 눌러도 돼요.</p>
       </div>
       <div id="petBond" class="stack"></div>
+      ${posts}
       <hr>
       <p><b>간식</b> <small class="muted">오늘 ${fed}/${TREATS_PER_DAY}</small></p>
       <p class="muted">간식을 주면 친밀도가 많이 올라요. 친구마다 하루에 ${TREATS_PER_DAY}개까지 먹어요. 한 번 누르고, 한 번 더 눌러 구매 확정해야 사요. 주고 나면 창이 닫히고 가게에서 먹는 모습이 보여요.</p>
@@ -88,7 +104,13 @@ export function createPetUI({ icon, coin, toast, openSheet, closeSheet, renderer
         pick(el) { sfx('tap'); openPets(Number(el.dataset.id)); },
         adopt() { sfx('tap'); openAdopt(); },
         // 쓰다듬거나 간식을 주면 창을 닫는다. 창이 가게를 가려서 친구가 좋아하는 모습이 안 보이기 때문이다.
-        pet() { closeSheet(); petPet(pet.id); },
+        pet() {
+          if (awayNow) { toast(`${josa(pet.name, '은', '는')} 지금 ${shopNo(pet.post)}호점을 맡고 있어요`); return; }
+          closeSheet();
+          petPet(pet.id);
+        },
+        post(el) { if (setPost(pet.id, el.dataset.id)) { sfx('place'); changed(); } },
+        unpost() { if (setPost(pet.id, null)) { sfx('place'); changed(); } },
         treat(el) {
           const tid = el.dataset.id;
           if (treating !== tid) {
