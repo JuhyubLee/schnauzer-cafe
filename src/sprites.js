@@ -361,6 +361,57 @@ def('trophy', [
   '................',
 ]);
 
+// 레벨 11: 자판기. 간판과 단추 불빛이 번갈아 켜진다.
+const VENDING = (sign, b1, b2, b3) => [
+  '................',
+  '..oooooooooooo..',
+  `..o${sign}o..`,
+  '..oooooooooooo..',
+  '..owwwwwwwwooo..',
+  `..owrwywnwwo${b1}o..`,
+  '..owrwywnwwooo..',
+  '..owwwwwwwwooo..',
+  `..owuwpwmwwo${b2}o..`,
+  '..owuwpwmwwooo..',
+  '..owwwwwwwwooo..',
+  `..ownwrwywwo${b3}o..`,
+  '..ownwrwywwooo..',
+  '..owwwwwwwwooo..',
+  '..oooooooooooo..',
+  '..oKKKKKKKKoGo..',
+  '..oKKKKKKKKooo..',
+  '..OOOOOOOOOOOO..',
+  '..G..........G..',
+  '................',
+];
+def('vending', VENDING('yayayayaya', 'y', 'G', 'y'));
+def('vending_b', VENDING('ayayayayay', 'G', 'y', 'G'));
+
+// 레벨 12(최고 레벨) 기념: 황금 슈나우저 동상. 동물 친구 슈나우저(PET_ROWS)와 같은 모습을 금빛으로 칠했다.
+// 두 번째 그림에는 몸통에 반짝임(q)이 있다.
+const STATUE = body => [
+  '................',
+  '........G...G...',
+  '.......GGgggGG..',
+  '.......GgggggG..',
+  '..g....gllgllg..',
+  '..g....gegggeg..',
+  '..ggggwwwwnwwww.',
+  ...body,
+  '.ggggggggg......',
+  '..GG....GG......',
+  '.cccccccccccccc.',
+  '..CCCCCCCCCCCC..',
+  '..cccccccccccc..',
+  '..ccccYYYYcccc..',
+  '..cccccccccccC..',
+  '.CCCCCCCCCCCCCC.',
+  '................',
+];
+const GOLD = { g: PAL.y, G: PAL.Y, l: '#fff3b0', w: '#ffe58a', e: '#9a6a12', n: '#9a6a12', p: PAL.Y, q: '#fffbe6' };
+def('statue', STATUE(['.gggggwwwwwwwww.', '.ggggggwwwpwww..', '.gggggggwwwww...']), { pal: GOLD });
+def('statue_b', STATUE(['.ggqggwwwwwwwww.', '.gqqqggwwwpwww..', '.ggqggggwwwww...']), { pal: GOLD });
+
 def('shelf', [
   'kkkkkkkkkkkkkkkk',
   'kbbbbbbbbbbbbbbk',

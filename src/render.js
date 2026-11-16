@@ -122,6 +122,15 @@ const WALL_PAINT = {
       }
     }
   },
+  gold(g, w, h) {
+    g.fillStyle = '#f0c060'; g.fillRect(0, 0, w, h);
+    for (let y = 4, row = 0; y < h; y += 7, row++) {
+      for (let x = row % 2 ? 10 : 3; x < w; x += 14) {
+        g.fillStyle = '#fff6d0'; g.fillRect(x - 1, y, 3, 1); g.fillRect(x, y - 1, 1, 3);
+        g.fillStyle = '#d9a03a'; g.fillRect(x + 6, y + 3, 1, 1);
+      }
+    }
+  },
 };
 
 export function createRenderer(canvas, atlas) {

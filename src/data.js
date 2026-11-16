@@ -61,6 +61,7 @@ export const FURN = {
   shelf: { name: '책장', sprite: 'shelf', group: 'deco', price: 180, lv: 5, block: true, charm: 5 },
   aquarium: { name: '수족관', sprite: 'aquarium', blink: 'aquarium_b', group: 'deco', price: 1500, lv: 6, block: true, charm: 8 },
   fountain: { name: '분수', sprite: 'fountain', blink: 'fountain_b', group: 'deco', price: 4000, lv: 10, block: true, charm: 12 },
+  statue: { name: '황금 슈나우저 동상', sprite: 'statue', blink: 'statue_b', group: 'deco', price: 8000, lv: 12, block: true, charm: 15 },
   musicbox: { name: '오르골', sprite: 'musicbox', blink: 'musicbox_b', group: 'deco', stamps: 15, lv: 1, block: true, charm: 8 },
   trophy: { name: '단골 트로피', sprite: 'trophy', group: 'deco', stamps: 25, lv: 1, block: true, charm: 10 },
   candle: { name: '양초', sprite: 'candle', group: 'light', price: 50, lv: 1, block: true, charm: 1, light: '#ffc46e' },
@@ -69,6 +70,7 @@ export const FURN = {
   lamp: { name: '스탠드 조명', sprite: 'lamp', group: 'light', price: 120, lv: 4, block: true, charm: 4, light: '#ffba6e' },
   lamp_mint: { name: '민트 스탠드 조명', sprite: 'lamp_mint', group: 'light', price: 200, lv: 6, block: true, charm: 4, light: '#9bdccb' },
   fireplace: { name: '벽난로', sprite: 'fireplace', blink: 'fireplace_b', group: 'light', price: 2500, lv: 8, block: true, charm: 10, light: '#ff9a4c' },
+  vending: { name: '자판기', sprite: 'vending', blink: 'vending_b', group: 'light', price: 5000, lv: 11, block: true, charm: 12, light: '#cfe8ff' },
   rug: { name: '주황 러그', sprite: 'rug', group: 'mat', price: 30, lv: 2, block: false, charm: 1 },
   dogbed: { name: '폭신 방석', sprite: 'dogbed', group: 'mat', price: 90, lv: 2, block: false, charm: 2 },
   xmas_tree: { name: '크리스마스 트리', sprite: 'xmas_tree', blink: 'xmas_tree_b', group: 'season', season: 'xmas', price: 300, lv: 1, block: true, charm: 6, light: '#ffd76e' },
@@ -195,6 +197,7 @@ export const WALLS = {
   plank: { name: '나무 판벽', price: 450, lv: 6 },
   flower: { name: '꽃무늬 벽지', price: 600, lv: 7 },
   navy: { name: '남색 별무늬', price: 900, lv: 9 },
+  gold: { name: '금빛 별무늬', price: 1500, lv: 12 },
 };
 
 // 벽 액자에 거는 사진의 크기(픽셀). 고른 사진을 이 크기로 줄여서 저장한다.
