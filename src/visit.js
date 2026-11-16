@@ -6,8 +6,9 @@ import { G, level, enterVisit, leaveVisit, save, MAX_ROWS, MAX_COLS } from './ga
 import { putShop, getShop, deleteShop, reportShop } from './cloud.js';
 import {
   RECIPES, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FLOORS, WALLS, PETS, PET_SLOTS, PET_NAME_MAX,
-  WEAR, START_ROWS, START_COLS, START_DOOR, LEVEL_XP, VISIT_GIFT, GIFTS_PER_DAY, STOVE_SPEED, SITE_URL,
+  WEAR, START_ROWS, START_COLS, START_DOOR, LEVEL_XP, VISIT_GIFT, GIFTS_PER_DAY, STOVE_SPEED, SITE_URL, FIRST_SHOP,
 } from './data.js';
+import { through } from './bytes.js';
 import { validIcon } from './sprites.js';
 import { mirror } from './device.js';
 
@@ -28,36 +29,22 @@ const toB64 = bytes => {
 };
 const fromB64 = text => Uint8Array.from(atob(text.replace(/-/g, '+').replace(/_/g, '/')), ch => ch.charCodeAt(0));
 
-async function through(bytes, stream) {
-  const reader = new Blob([bytes]).stream().pipeThrough(stream).getReader();
-  const chunks = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.length;
-    if (total > MAX_BYTES) { await reader.cancel(); throw new Error('too big'); }
-    chunks.push(value);
-  }
-  const out = new Uint8Array(total);
-  let at = 0;
-  for (const c of chunks) { out.set(c, at); at += c.length; }
-  return out;
-}
-
 // ───── 초대장 만들기 ─────
 
-// 내 가게의 번호(sid)와 열쇠(skey). 서버에 올린 가게 모습은 이 열쇠로만 고치거나 지울 수 있다.
+// 가게의 번호(sid)와 열쇠(skey). 서버에 올린 가게 모습은 이 열쇠로만 고치거나 지울 수 있다. 가게마다 따로 있다.
 // 저장(백업 코드)에 같이 들어 있어서, 기기를 옮겨도 같은 가게로 이어진다. 구경 중에는 내 가게가 G.home에 있다.
 const SID = /^[a-z0-9]{6,24}$/, SKEY = /^[a-f0-9]{32}$/;
 const randomKey = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
 function mine() {
   const s = G.home || G.state;
-  if (!SID.test(s.sid || '')) s.sid = friends().me; // 서버가 생기기 전에 보낸 초대장의 번호를 그대로 쓴다
+  // 첫 가게는 서버가 생기기 전에 보낸 초대장의 번호를 그대로 쓴다. 다른 가게가 그 번호를 받으면 서버에서 서로 덮어쓰므로 새로 뽑는다.
+  if (!SID.test(s.sid || '')) s.sid = s.type === FIRST_SHOP ? friends().me : randomKey().slice(0, 12);
   if (!SKEY.test(s.skey || '')) s.skey = randomKey();
   return s;
 }
 export const myId = () => mine().sid;
+// 내 가게들(지금 연 가게와 다른 가게들) 가운데 하나의 번호인지
+const isMine = sid => { const s = mine(); return [s, ...s.others].some(shop => shop.sid === sid); };
 
 // 내 가게의 겉모습만 추린다. 구경 중에는 부르지 않는다.
 export function makeSnapshot() {
@@ -82,7 +69,7 @@ export function makeSnapshot() {
 export async function encode(snap) {
   const bytes = new TextEncoder().encode(JSON.stringify(snap));
   if (typeof CompressionStream === 'undefined') return 'V0.' + toB64(bytes);
-  return 'V1.' + toB64(await through(bytes, new CompressionStream('deflate-raw')));
+  return 'V1.' + toB64(await through(bytes, new CompressionStream('deflate-raw'), MAX_BYTES));
 }
 
 // 앱 안에서는 주소가 달라서, 초대장은 항상 웹 주소로 만든다.
@@ -98,7 +85,7 @@ export async function decode(code) {
   try {
     if (typeof code !== 'string' || code.length > MAX_CODE || !/^V[01]\./.test(code)) return null;
     let bytes = fromB64(code.slice(3));
-    if (code[1] === '1') bytes = await through(bytes, new DecompressionStream('deflate-raw'));
+    if (code[1] === '1') bytes = await through(bytes, new DecompressionStream('deflate-raw'), MAX_BYTES);
     if (bytes.length > MAX_BYTES) return null;
     return sanitize(JSON.parse(new TextDecoder().decode(bytes)));
   } catch {
@@ -187,7 +174,7 @@ function store() {
 // 받은 초대장을 목록 맨 위에 적어 둔다. 같은 가게면 새 모습으로 바꾼다. 내 가게 초대장은 적지 않는다.
 export function rememberFriend(snap, code) {
   const f = friends();
-  if (snap.s === myId()) return;
+  if (isMine(snap.s)) return;
   const old = f.list.find(e => e.sid === snap.s);
   const d = new Date();
   f.list = [
@@ -214,7 +201,7 @@ function shopFrom(snap) {
   for (const c of custom) if (CUSTOM_TIERS[c.tier].lv <= snap.l) stock[c.id] = 99;
   const home = G.state;
   return {
-    v: 1, started: true, shopName: snap.n,
+    v: 1, started: true, type: FIRST_SHOP, others: [], shopName: snap.n,
     coins: 0, xp: LEVEL_XP[snap.l - 1], rows: snap.r, cols: snap.k, door: snap.d,
     items: snap.i.map(([type, x, y, lv], i) => ({ id: i + 1, type, x, y, ...(type === 'stove' ? { lv, cook: null } : {}) })),
     nextId: snap.i.length + 1,
@@ -234,7 +221,7 @@ function shopFrom(snap) {
 }
 
 export function startVisit(snap) {
-  enterVisit(shopFrom(snap), { name: snap.n, sid: snap.s, mine: snap.s === myId(), snap });
+  enterVisit(shopFrom(snap), { name: snap.n, sid: snap.s, mine: isMine(snap.s), snap });
 }
 
 // 내 가게로 돌아온다. 방문 선물을 받았으면 그 코인 수, 아니면 0.

@@ -202,6 +202,11 @@ export const PHOTO_W = 22;
 export const PHOTO_H = 18;
 export const PHOTO_MAX_CHARS = 12000;
 
+// 가게 종류. 저장의 맨 위에는 언제나 첫 가게(FIRST_SHOP)를 둔다. 예전 버전이 그 모양만 읽을 수 있어서다.
+// 종류를 더하면 그 가게의 값은 저장의 others에 들어간다(game.js의 '가게 여러 개').
+export const SHOP_TYPES = { bunsik: { name: '분식' } };
+export const FIRST_SHOP = 'bunsik';
+
 // 처음 가게의 크기와 문 자리(왼쪽에서 0부터 센 칸)
 export const START_ROWS = 6;
 export const START_COLS = 8;

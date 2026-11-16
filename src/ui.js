@@ -235,7 +235,7 @@ export function initUI({ atlas, renderer }) {
           $('restoreCode').value = code;
           toast('복사가 안 돼요. 아래 칸의 코드를 길게 눌러 복사해 주세요');
         },
-        restore(el) {
+        async restore(el) {
           const code = $('restoreCode').value;
           if (!code.trim()) { toast('먼저 백업 코드를 붙여 넣어 주세요'); return; }
           if (!el.dataset.sure) {
@@ -243,7 +243,7 @@ export function initUI({ atlas, renderer }) {
             el.textContent = '지금 가게를 덮어써요. 한 번 더 누르면 되살려요';
             return;
           }
-          if (importSave(code)) { location.reload(); return; }
+          if (await importSave(code)) { location.reload(); return; }
           delete el.dataset.sure;
           el.textContent = '이 코드로 되살리기';
         },

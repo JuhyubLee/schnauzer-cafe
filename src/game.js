@@ -2,11 +2,13 @@
 import {
   RECIPES, RECIPE, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FURN_GROUPS, FLOORS, WALLS,
   PETS, PET_SLOTS, PET_NAME_MAX, WEAR, START_ROWS, START_COLS, START_DOOR, EXPANSIONS, WIDENINGS, EXPAND_DIRS,
-  STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, TREATS, TREATS_PER_DAY, levelOf, stoveLimit, onSale, bondOf, dayKey,
+  STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, TREATS, TREATS_PER_DAY, SHOP_TYPES, FIRST_SHOP,
+  levelOf, stoveLimit, onSale, bondOf, dayKey,
 } from './data.js';
 import { CUSTOMER_LOOKS, validIcon } from './sprites.js';
 import { mirror } from './device.js';
 import { bump } from './daily.js';
+import { through } from './bytes.js';
 
 // 가게 크기는 저장에 있다: state.rows(세로 줄 수), state.cols(가로 칸 수). 칸 번호는 y * cols + x.
 // 문은 윗벽의 state.door 칸 위에 있고, 그 아래 칸 (door, 0)은 손님이 드나드는 길이다.
@@ -33,7 +35,7 @@ function freshState() {
   let id = 1;
   const it = (type, x, y, extra) => ({ id: id++, type, x, y, ...extra });
   return {
-    v: 1, started: false, shopName: '',
+    v: 1, started: false, type: FIRST_SHOP, shopName: '',
     coins: 100, xp: 0, rows: START_ROWS, cols: START_COLS, door: START_DOOR,
     items: [
       it('stove', 1, 0, { lv: 1, cook: null }), it('plant', 0, 0),
@@ -53,6 +55,7 @@ function freshState() {
     share: false, // 가게 모습을 서버에 올려 최신 모습을 보여 줄지. 가게 번호(sid)와 열쇠(skey)는 visit.js가 처음 쓸 때 채운다
     stamps: 0, daily: null, // 도장 수와 오늘의 주문(daily.js)
     stats: { sold: 0, cooked: 0 },
+    others: [], // 다른 가게들(아래 '가게 여러 개')
   };
 }
 
@@ -79,6 +82,8 @@ function upgrade(s) {
   s.stamps ??= 0;
   s.daily ??= null;
   s.song ??= 'auto';
+  s.type ??= FIRST_SHOP;
+  s.others = Array.isArray(s.others) ? s.others.filter(o => o && typeof o === 'object') : [];
   delete s.lastSeen; // 자리를 비운 동안 팔던 때 쓰던 값
   return s;
 }
@@ -104,13 +109,54 @@ function syncPets() {
   });
 }
 
+// ───── 가게 여러 개 ─────
+// G.state의 맨 위에는 지금 연 가게의 값이 있고, 다른 가게는 state.others에 { type, shopName, coins, … } 모양으로 있다.
+// 아래가 가게마다 따로 있는 값이다. 나머지(친구, 옷장, 도장, 보관함, 설정)는 모든 가게가 같이 쓴다.
+const SHOP_FIELDS = [
+  'type', 'shopName', 'coins', 'xp', 'rows', 'cols', 'door', 'items', 'nextId', 'floor', 'wall', 'stock',
+  'custom', 'nextCustom', 'photo', 'stats', 'tut', 'share', 'sid', 'skey',
+];
+const has = Object.hasOwn;
+
+// s의 맨 위 가게와 others에 있는 type 가게를 서로 바꿔 끼운다.
+function rotate(s, type) {
+  const other = s.others.find(o => o.type === type);
+  for (const k of SHOP_FIELDS) {
+    const mine = s[k];
+    if (other[k] === undefined) delete s[k]; else s[k] = other[k];
+    if (mine === undefined) delete other[k]; else other[k] = mine;
+  }
+}
+
+// 저장에 쓰는 모양: 언제나 첫 가게(분식)가 맨 위에 있고, 열려 있던 가게는 open에 적는다.
+// 다른 가게를 모르는 예전 버전이 이 저장을 읽어도 분식을 그대로 돌리고 others는 건드리지 않는다.
+// 첫 가게가 열려 있으면 s 그대로, 아니면 s를 고치지 않고 사본을 돌려준다.
+function pack(s) {
+  if (s.type === FIRST_SHOP) return s;
+  const copy = { ...s, others: s.others.map(o => ({ ...o })), open: s.type };
+  rotate(copy, FIRST_SHOP);
+  return copy;
+}
+
+// 저장에서 읽은 것을 게임이 쓰는 모양으로: open에 적힌 가게를 맨 위로 올린다.
+// 이 버전이 모르는 종류의 가게면 그대로 둔다(분식이 열리고, open과 그 가게는 저장에 남는다).
+function unpack(s) {
+  if (!has(SHOP_TYPES, s.open) || !s.others.some(o => o.type === s.open)) return s;
+  rotate(s, s.open);
+  delete s.open;
+  return s;
+}
+
 // ───── 저장 ─────
+
+// 지금 상태를 저장에 쓰는 글(JSON)로 바꾼다.
+export const saveText = () => JSON.stringify(pack(G.state));
 
 // 저장하고, 저장한 글(JSON)을 돌려준다.
 // 구경 중에는 state가 남의 가게라서 절대 저장하지 않는다. (저장하면 내 가게가 덮인다)
 export function save() {
   if (G.visit) return null;
-  const json = JSON.stringify(G.state);
+  const json = saveText();
   try { localStorage.setItem(SAVE_KEY, json); } catch { /* 저장 공간이 막힌 브라우저 */ }
   mirror(SAVE_KEY, json);
   return json;
@@ -119,7 +165,7 @@ export function save() {
 export function load() {
   let s = null;
   try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch { /* 깨진 저장은 버린다 */ }
-  G.state = s && s.v === 1 ? upgrade(s) : freshState();
+  G.state = s && s.v === 1 ? unpack(upgrade(s)) : freshState();
   G.edit = null;
   customCache = null;
   freshWorld();
@@ -168,56 +214,73 @@ export function leaveVisit() {
 
 // ───── 백업 코드 ─────
 
-const BACKUP_PREFIX = 'CAFE1:';
+const BACKUP_PREFIX = 'CAFE1:'; // 저장 글을 그대로 base64로 바꾼 것
+const PACKED_PREFIX = 'CAFE2:'; // 저장 글을 압축(deflate-raw)한 뒤 base64로 바꾼 것. 읽기만 하고, 아직 이 모양으로 내지는 않는다
+const MAX_BACKUP_BYTES = 400000; // 압축을 푼 저장 글의 크기 한도
 export const MAX_ROWS = START_ROWS + Object.keys(EXPANSIONS).length;
 export const MAX_COLS = START_COLS + Object.keys(WIDENINGS).length;
+const int = Number.isInteger;
+const obj = v => !!v && typeof v === 'object';
 
-// 붙여 넣은 백업이 이 게임이 읽을 수 있는 모양인지 본다. 잘린 코드나 엉뚱한 글을 걸러 낸다.
-function usable(s) {
-  const int = Number.isInteger, has = Object.hasOwn;
-  const obj = v => !!v && typeof v === 'object';
+// 가게 하나의 값이 이 게임이 읽을 수 있는 모양인지 본다.
+function usableShop(s) {
   const recipe = id => has(RECIPE, id) || s.custom.some(c => c.id === id);
-  return obj(s) && s.v === 1
-    && typeof s.shopName === 'string'
-    && int(s.coins) && s.coins >= 0 && int(s.xp) && s.xp >= 0
-    && int(s.nextId) && int(s.nextPet) && int(s.nextCustom)
+  return has(SHOP_TYPES, s.type) && typeof s.shopName === 'string'
+    && int(s.coins) && s.coins >= 0 && int(s.xp) && s.xp >= 0 && int(s.nextId) && int(s.nextCustom)
     && int(s.rows) && s.rows >= START_ROWS && s.rows <= MAX_ROWS
     && int(s.cols) && s.cols >= START_COLS && s.cols <= MAX_COLS && int(s.door) && s.door >= 0 && s.door < s.cols
     && Array.isArray(s.floor) && s.floor.length === s.rows * s.cols && s.floor.every(f => has(FLOORS, f))
-    && has(WALLS, s.wall) && Array.isArray(s.walls) && Array.isArray(s.notes)
-    && (s.photo === null || validPhoto(s.photo))
-    && typeof s.share === 'boolean' && typeof s.song === 'string'
+    && has(WALLS, s.wall) && (s.photo === null || validPhoto(s.photo)) && typeof s.share === 'boolean'
     && (s.sid === undefined || /^[a-z0-9]{6,24}$/.test(s.sid)) && (s.skey === undefined || /^[a-f0-9]{32}$/.test(s.skey))
-    && obj(s.inv) && obj(s.stock) && obj(s.stats)
-    && Array.isArray(s.closet) && s.closet.every(id => has(WEAR, id))
+    && obj(s.stock) && obj(s.stats)
     && Array.isArray(s.custom) && s.custom.length <= MAX_CUSTOM && s.custom.every(c => obj(c)
       && /^c\d+$/.test(c.id) && typeof c.name === 'string' && has(CUSTOM_TIERS, c.tier) && validIcon(c.px))
-    && int(s.stamps) && s.stamps >= 0 && (s.daily === null || obj(s.daily))
-    && Array.isArray(s.pets) && s.pets.length >= 1 && s.pets.length <= PET_SLOTS.length && s.pets.every(p => obj(p)
-      && int(p.id) && has(PETS, p.species) && typeof p.name === 'string' && int(p.love) && obj(p.wear)
-      && Object.entries(p.wear).every(([slot, id]) => has(WEAR, id) && WEAR[id].slot === slot))
     && Array.isArray(s.items) && s.items.every(i => obj(i) && has(FURN, i.type)
       && int(i.x) && int(i.y) && i.x >= 0 && i.x < s.cols && i.y >= 0 && i.y < s.rows
       && (i.type !== 'stove' || (STOVE_SPEED[i.lv - 1] > 0 && (!i.cook || recipe(i.cook.r)))));
 }
 
+// 붙여 넣은 백업(저장에 쓰는 모양)이 이 게임이 읽을 수 있는 모양인지 본다. 잘린 코드나 엉뚱한 글을 걸러 낸다.
+// others에는 종류마다 가게가 하나씩만 있어야 한다. 이 버전이 모르는 종류의 가게는 들여다보지 않고 그대로 간직한다
+// (그 가게를 아는 버전으로 올린 뒤에 다시 열린다).
+function usable(s) {
+  return obj(s) && s.v === 1 && s.type === FIRST_SHOP && usableShop(s)
+    && s.others.length <= 8 && s.others.every((o, i) => typeof o.type === 'string' && o.type !== s.type
+      && s.others.findIndex(p => p.type === o.type) === i && (!has(SHOP_TYPES, o.type) || usableShop(o)))
+    && (s.open === undefined || s.others.some(o => o.type === s.open))
+    && int(s.nextPet) && Array.isArray(s.walls) && Array.isArray(s.notes) && typeof s.song === 'string' && obj(s.inv)
+    && Array.isArray(s.closet) && s.closet.every(id => has(WEAR, id))
+    && int(s.stamps) && s.stamps >= 0 && (s.daily === null || obj(s.daily))
+    && Array.isArray(s.pets) && s.pets.length >= 1 && s.pets.length <= PET_SLOTS.length && s.pets.every(p => obj(p)
+      && int(p.id) && has(PETS, p.species) && typeof p.name === 'string' && int(p.love) && obj(p.wear)
+      && Object.entries(p.wear).every(([slot, id]) => has(WEAR, id) && WEAR[id].slot === slot));
+}
+
 export function exportSave() {
   let bin = '';
-  for (const b of new TextEncoder().encode(JSON.stringify(G.state))) bin += String.fromCharCode(b);
+  for (const b of new TextEncoder().encode(saveText())) bin += String.fromCharCode(b);
   return BACKUP_PREFIX + btoa(bin);
 }
 
-// 백업 코드로 가게를 통째로 바꾼다. 성공하면 저장까지 하고 true.
-export function importSave(code) {
-  code = code.replace(/\s+/g, ''); // 메신저가 넣은 줄바꿈
-  let s = null;
+// 백업 코드 → 검사를 통과한 저장. 읽을 수 없으면 null.
+async function decodeBackup(code) {
   try {
-    const bin = atob(code.slice(BACKUP_PREFIX.length));
-    s = JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, ch => ch.charCodeAt(0))));
-    if (s && s.v === 1) upgrade(s);
-  } catch { s = null; }
-  if (!code.startsWith(BACKUP_PREFIX) || !usable(s)) return fail('백업 코드가 올바르지 않아요. 처음부터 끝까지 복사했는지 봐 주세요');
-  G.state = s;
+    const packed = code.startsWith(PACKED_PREFIX);
+    if (!packed && !code.startsWith(BACKUP_PREFIX)) return null;
+    let bytes = Uint8Array.from(atob(code.slice(BACKUP_PREFIX.length)), ch => ch.charCodeAt(0));
+    if (packed) bytes = await through(bytes, new DecompressionStream('deflate-raw'), MAX_BACKUP_BYTES);
+    const s = JSON.parse(new TextDecoder().decode(bytes));
+    return s && s.v === 1 && usable(upgrade(s)) ? s : null;
+  } catch {
+    return null;
+  }
+}
+
+// 백업 코드로 가게를 통째로 바꾼다. 성공하면 저장까지 하고 true.
+export async function importSave(code) {
+  const s = await decodeBackup(code.replace(/\s+/g, '')); // 메신저가 넣은 줄바꿈을 뺀다
+  if (!s) return fail('백업 코드가 올바르지 않아요. 처음부터 끝까지 복사했는지 봐 주세요');
+  G.state = unpack(s);
   G.edit = null;
   customCache = null;
   freshWorld();
@@ -228,6 +291,9 @@ export function importSave(code) {
 // ───── 조회 ─────
 
 export const level = () => levelOf(G.state.xp);
+// 내 가게들 가운데 가장 높은 레벨. 친구를 데려오는 조건이나 오늘의 주문 목표처럼 가게 하나에 딸리지 않은 일에 쓴다.
+export const bestLevel = (s = G.state) =>
+  Math.max(levelOf(s.xp), ...s.others.filter(o => has(SHOP_TYPES, o.type)).map(o => levelOf(o.xp)));
 export const itemAt = (x, y) => G.state.items.find(i => i.x === x && i.y === y);
 export const itemById = id => G.state.items.find(i => i.id === id);
 export const petById = id => G.state.pets.find(p => p.id === id);
@@ -618,7 +684,7 @@ export function adopt(species, name) {
   const s = G.state, slot = adoptSlot();
   name = name.trim().slice(0, PET_NAME_MAX);
   if (!slot) return fail('친구는 지금이 가장 많아요');
-  if (level() < slot.lv) return fail(`레벨 ${slot.lv}부터 데려올 수 있어요`);
+  if (bestLevel() < slot.lv) return fail(`레벨 ${slot.lv}부터 데려올 수 있어요`);
   if (!name) return fail('친구 이름을 지어 주세요');
   if (s.coins < slot.price) return fail('코인이 모자라요');
   s.coins -= slot.price;
@@ -730,20 +796,42 @@ export function enterEdit() {
   if (G.state.tut === 3) G.state.tut = 4;
 }
 
+// 손님을 모두 내보낸다. 먹던 손님은 계산하고 나간다.
+function sendOff() {
+  const w = G.world;
+  for (const c of w.customers) if (c.state === 'eat') pay(c);
+  w.customers = [];
+}
+
+// 친구들을 지금 가게의 가까운 빈 칸에 세운다.
+function settlePets() {
+  for (const p of G.world.pets) {
+    const pos = nearestFree(Math.round(p.x), Math.round(p.y));
+    Object.assign(p, { x: pos.x, y: pos.y, path: [], state: 'idle', t: 1, target: null });
+  }
+}
+
 export function exitEdit() {
   const dirty = G.edit.dirty;
   G.edit = null;
-  if (dirty) {
-    // 배치가 바뀌면 길이 달라지므로 손님을 내보낸다. 먹던 손님은 계산하고 나간다.
-    const w = G.world;
-    for (const c of w.customers) if (c.state === 'eat') pay(c);
-    w.customers = [];
-    for (const p of w.pets) {
-      const pos = nearestFree(Math.round(p.x), Math.round(p.y));
-      Object.assign(p, { x: pos.x, y: pos.y, path: [], state: 'idle', t: 1, target: null });
-    }
-  }
+  // 배치가 바뀌면 길이 달라지므로 손님을 내보낸다.
+  if (dirty) { sendOff(); settlePets(); }
   save();
+}
+
+// others에 있는 다른 가게로 옮긴다. 옮겼으면 true. 구경 중이거나 꾸미는 중에는 옮기지 않는다.
+// 먹던 손님은 떠나는 가게의 지갑으로 계산하고, 친구들은 따라온다.
+export function switchShop(type) {
+  const s = G.state;
+  if (G.visit || G.edit || !has(SHOP_TYPES, type) || !s.others.some(o => o.type === type)) return false;
+  sendOff();
+  rotate(s, type);
+  customCache = null;
+  for (const c of s.custom) emit('custom', c.id); // 가게마다 나만의 메뉴 번호가 겹쳐서 그림을 다시 만든다
+  settlePets();
+  emit('resize');
+  save();
+  return true;
 }
 
 function placeError(type, x, y) {

@@ -1,6 +1,6 @@
 // 시작점: 불러오기, 화면 크기 맞추기, 터치 처리, 매 프레임 갱신.
 import {
-  G, load, save, tick, on, serve, petPet, collect, cookState, stoves, recipeOf,
+  G, load, save, saveText, tick, on, serve, petPet, collect, cookState, stoves, recipeOf,
   askPlace, moveItem, askPaint,
 } from './game.js';
 import { fmtTime } from './data.js';
@@ -159,7 +159,7 @@ function frame(now) {
   tick(dt);
   renderer.draw();
   if ((uiT += dt) > 0.25) { uiT = 0; ui.refresh(); }
-  if (G.state.started && !G.visit && JSON.stringify(G.state) !== saved) saved = save();
+  if (G.state.started && !G.visit && saveText() !== saved) saved = save();
   if ((syncT += dt) > SYNC_EVERY) { syncT = 0; ui.syncShop(); }
   requestAnimationFrame(frame);
 }

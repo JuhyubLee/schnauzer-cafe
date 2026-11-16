@@ -1,5 +1,5 @@
 // 동물 친구 창: 쓰다듬기, 친밀도 단계, 간식, 옷장, 이름과 모습 바꾸기, 새 친구 데려오기.
-import { G, level, petById, petPet, feed, fedToday, wear, renamePet, setSpecies, adopt, adoptSlot, save } from './game.js';
+import { G, bestLevel, petById, petPet, feed, fedToday, wear, renamePet, setSpecies, adopt, adoptSlot, save } from './game.js';
 import { PETS, PET_NAME_MAX, WEAR, WEAR_SLOTS, SEASONS, BONDS, TREATS, TREATS_PER_DAY, bondOf, onSale } from './data.js';
 import { $, esc, setHTML } from './dom.js';
 import { sfx } from './sfx.js';
@@ -139,7 +139,7 @@ export function createPetUI({ icon, coin, toast, openSheet, closeSheet, renderer
   function openAdopt() {
     const slot = adoptSlot();
     let picked = Object.keys(PETS)[0];
-    const locked = level() < slot.lv;
+    const locked = bestLevel() < slot.lv;
     const draw = (typed = '') => {
       openSheet('새 친구 데려오기', `
         <p class="muted">친구가 늘면 서빙도 그만큼 빨라져요.</p>

@@ -1,7 +1,7 @@
 // 오늘의 주문과 도장. 날마다 주문 세 가지가 오고, 하나 끝낼 때마다 도장 1개, 그날 것을 다 끝내면 1개 더 받는다.
 // 도장은 도장 가게에서만 쓴다. 거기 물건(data.js에서 stamps가 붙은 옷과 가구)은 코인으로는 살 수 없다.
-import { G, emit } from './game.js';
-import { DAILY, DAILY_COUNT, FURN, WEAR, dayKey, levelOf } from './data.js';
+import { G, emit, bestLevel } from './game.js';
+import { DAILY, DAILY_COUNT, FURN, WEAR, dayKey } from './data.js';
 
 // 날짜 글에서 그날의 주문 종류를 고른다. 같은 날에는 언제 열어도 같은 주문이 나온다.
 function kindsFor(day) {
@@ -21,7 +21,7 @@ function kindsFor(day) {
 export function daily() {
   const s = G.home || G.state, day = dayKey();
   if (s.daily?.day !== day) {
-    const lv = levelOf(s.xp);
+    const lv = bestLevel(s);
     s.daily = {
       day,
       goals: kindsFor(day).map(kind => ({ kind, need: Math.round(DAILY[kind].base + DAILY[kind].perLv * lv), n: 0 })),
