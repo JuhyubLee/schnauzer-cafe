@@ -5,7 +5,7 @@ import {
 } from './game.js';
 import { fmtTime } from './data.js';
 import { buildAtlas, setSprite } from './sprites.js';
-import { createRenderer, viewW, viewH, tileAt, TILE, PAD, WALL_H, photoRect } from './render.js';
+import { createRenderer, viewW, viewH, tileAt, TILE, PAD, WALL_H, photoRect, doorRect } from './render.js';
 import { initUI } from './ui.js';
 import { sfx, resetAudio } from './sfx.js';
 import { syncMusic } from './music.js';
@@ -83,6 +83,9 @@ function playTap(p) {
   // 벽의 큰 액자: 누르기 쉽게 둘레 3px까지 받는다
   const frame = photoRect(G.state);
   if (inRect(p, frame.x - 3, frame.y - 3, frame.w + 6, frame.h + 6)) { sfx('tap'); ui.openPhoto(); return; }
+  // 문: 누르면 골목으로 나가 다른 가게로 가거나 새 가게를 연다
+  const door = doorRect(G.state);
+  if (inRect(p, door.x - 2, door.y - 2, door.w + 4, door.h + 2)) { sfx('tap'); ui.openAlley(); return; }
   const it = renderer.pickItem(p.x, p.y);
   if (it?.type !== 'stove') return;
   if (cookState(it) === 'idle') { sfx('tap'); ui.openCook(it.id); }

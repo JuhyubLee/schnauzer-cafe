@@ -1,8 +1,9 @@
 // 게임 수치. 메뉴·가구·가격을 바꾸려면 이 파일만 고치면 된다.
 
 // time: 조리 시간(초), n: 한 번에 나오는 그릇 수, price: 한 그릇 값, lv: 열리는 레벨
+// shop: 이 메뉴를 파는 가게(SHOP_TYPES의 이름). 안 적으면 분식. 가게마다 수치의 크기는 같게 둔다(지갑이 따로라서).
 // 이름은 실제 상표와 겹치지 않는 흔한 말로 쓴다.
-// id는 저장 데이터에 들어가므로 이름을 바꿔도 id는 그대로 둔다.
+// id는 저장 데이터에 들어가므로 이름을 바꿔도 id는 그대로 둔다. 가게끼리도 겹치지 않게 짓는다.
 export const RECIPES = [
   { id: 'americano', name: '아이스 아메리카노', icon: 'f_americano', lv: 1, cost: 8, time: 15, n: 4, price: 5, xp: 3 },
   { id: 'riceball', name: '참치 주먹밥', icon: 'f_riceball', lv: 1, cost: 20, time: 40, n: 5, price: 9, xp: 5 },
@@ -14,6 +15,16 @@ export const RECIPES = [
   { id: 'cream', name: '크림 파스타', icon: 'f_cream', lv: 6, cost: 220, time: 1800, n: 12, price: 42, xp: 70 },
   { id: 'cheesetteok', name: '치즈 폭탄 떡볶이', icon: 'f_cheesetteok', lv: 7, cost: 300, time: 3600, n: 14, price: 50, xp: 110 },
   { id: 'buldakpasta', name: '매콤 크림 파스타', icon: 'f_buldakpasta', lv: 8, cost: 420, time: 10800, n: 16, price: 64, xp: 200 },
+  { id: 'latte', name: '카페라테', icon: 'f_latte', lv: 1, cost: 8, time: 15, n: 4, price: 5, xp: 3, shop: 'cafe' },
+  { id: 'cookie', name: '버터 쿠키', icon: 'f_cookie', lv: 1, cost: 20, time: 40, n: 5, price: 9, xp: 5, shop: 'cafe' },
+  { id: 'croissant', name: '크루아상', icon: 'f_croissant', lv: 2, cost: 55, time: 120, n: 8, price: 15, xp: 12, shop: 'cafe' },
+  { id: 'lemonade', name: '레몬에이드', icon: 'f_lemonade', lv: 2, cost: 12, time: 30, n: 6, price: 5, xp: 4, shop: 'cafe' },
+  { id: 'muffin', name: '초코 머핀', icon: 'f_muffin', lv: 3, cost: 90, time: 300, n: 8, price: 24, xp: 22, shop: 'cafe' },
+  { id: 'pudding', name: '커스터드 푸딩', icon: 'f_pudding', lv: 4, cost: 70, time: 480, n: 6, price: 28, xp: 26, shop: 'cafe' },
+  { id: 'tart', name: '과일 타르트', icon: 'f_tart', lv: 5, cost: 160, time: 900, n: 10, price: 36, xp: 45, shop: 'cafe' },
+  { id: 'cheesecake', name: '치즈 케이크', icon: 'f_cheesecake', lv: 6, cost: 220, time: 1800, n: 12, price: 42, xp: 70, shop: 'cafe' },
+  { id: 'tiramisu', name: '티라미수', icon: 'f_tiramisu', lv: 7, cost: 300, time: 3600, n: 14, price: 50, xp: 110, shop: 'cafe' },
+  { id: 'shortcake', name: '딸기 생크림 케이크', icon: 'f_shortcake', lv: 8, cost: 420, time: 10800, n: 16, price: 64, xp: 200, shop: 'cafe' },
 ];
 export const RECIPE = Object.fromEntries(RECIPES.map(r => [r.id, r]));
 
@@ -49,6 +60,8 @@ export const FURN_GROUPS = { seat: '테이블·의자', kitchen: '주방', deco:
 // table: 옆에 스툴을 붙이면 손님 자리가 되는 가구, light: 밤에 둘레를 밝히는 빛의 색
 // season: 계절 한정(SEASONS의 이름), blink: 번갈아 보여 줄 두 번째 그림
 // stamps: 코인으로는 못 사고 도장 가게에서 이만큼의 도장으로 받는 것(price가 없다)
+// shop: 이 가구가 딸린 가게(안 적으면 분식). lv는 그 가게의 레벨이다. 열린 뒤에는 어느 가게에서든 사고 놓는다.
+// stove는 어느 가게에서나 '요리하는 기구'다. 가게마다 이름과 그림이 다르다(SHOP_TYPES의 maker).
 export const FURN = {
   stool: { name: '주황 스툴', sprite: 'stool', group: 'seat', price: 25, lv: 1, block: true },
   table: { name: '원목 테이블', sprite: 'table', group: 'seat', price: 60, lv: 1, block: true, table: true },
@@ -79,6 +92,11 @@ export const FURN = {
   blossom: { name: '벚꽃 화분', sprite: 'blossom', group: 'season', season: 'spring', price: 90, lv: 1, block: true, charm: 3 },
   fan: { name: '선풍기', sprite: 'fan', group: 'season', season: 'summer', price: 100, lv: 1, block: true, charm: 2 },
   pumpkin: { name: '호박 장식', sprite: 'pumpkin', group: 'season', season: 'autumn', price: 60, lv: 1, block: true, charm: 2 },
+  table_marble: { name: '대리석 테이블', sprite: 'table_marble', group: 'seat', price: 120, lv: 2, block: true, table: true, charm: 2, shop: 'cafe' },
+  menuboard: { name: '메뉴 칠판', sprite: 'menuboard', group: 'deco', price: 80, lv: 1, block: true, charm: 3, shop: 'cafe' },
+  showcase: { name: '케이크 진열장', sprite: 'showcase', group: 'deco', price: 400, lv: 3, block: true, charm: 6, shop: 'cafe' },
+  neon: { name: '네온 간판', sprite: 'neon', blink: 'neon_b', group: 'light', price: 600, lv: 5, block: true, charm: 6, light: '#ff9ad2', shop: 'cafe' },
+  piano: { name: '피아노', sprite: 'piano', group: 'deco', price: 3000, lv: 8, block: true, charm: 12, shop: 'cafe' },
 };
 
 // 동물 친구. id는 sprites.js의 PET_PAL과 같아야 한다.
@@ -139,7 +157,7 @@ export const VISIT_GIFT = 30;
 export const GIFTS_PER_DAY = 3;
 
 // 앱 정보. 버전은 스토어에 올릴 때마다 올린다(android/app/build.gradle, ios 프로젝트와 같이).
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.4.0';
 // 웹 버전이 있는 주소. 초대장 링크와 개인정보 처리방침이 여기에 있다. 바꾸면 이미 보낸 초대장이 안 열린다.
 export const SITE_URL = 'https://juhyublee.github.io/schnauzer-cafe/';
 export const PRIVACY_URL = `${SITE_URL}privacy.html`;
@@ -185,6 +203,7 @@ export const FLOORS = {
   tile: { name: '크림 타일', price: 3, lv: 1 },
   check: { name: '주황 체크', price: 4, lv: 2 },
   mint: { name: '민트 타일', price: 5, lv: 4 },
+  parquet: { name: '쪽마루 바닥', price: 6, lv: 2, shop: 'cafe' },
 };
 
 export const WALLS = {
@@ -198,6 +217,7 @@ export const WALLS = {
   flower: { name: '꽃무늬 벽지', price: 600, lv: 7 },
   navy: { name: '남색 별무늬', price: 900, lv: 9 },
   gold: { name: '금빛 별무늬', price: 1500, lv: 12 },
+  sage: { name: '세이지 줄무늬', price: 400, lv: 3, shop: 'cafe' },
 };
 
 // 벽 액자에 거는 사진의 크기(픽셀). 고른 사진을 이 크기로 줄여서 저장한다.
@@ -205,10 +225,23 @@ export const PHOTO_W = 22;
 export const PHOTO_H = 18;
 export const PHOTO_MAX_CHARS = 12000;
 
-// 가게 종류. 저장의 맨 위에는 언제나 첫 가게(FIRST_SHOP)를 둔다. 예전 버전이 그 모양만 읽을 수 있어서다.
-// 종류를 더하면 그 가게의 값은 저장의 others에 들어간다(game.js의 '가게 여러 개').
-export const SHOP_TYPES = { bunsik: { name: '분식' } };
+// 가게 종류. 적은 순서가 1호점, 2호점이다. 저장의 맨 위에는 언제나 첫 가게(FIRST_SHOP)를 둔다. 예전 버전이 그 모양만 읽을 수 있어서다.
+// 다른 가게의 값은 저장의 others에 들어간다(game.js의 '가게 여러 개').
+// icon: 골목 화면에서 가게를 나타내는 그림, maker: 요리하는 기구의 이름과 그림(요리 중 그림은 이름 뒤에 _on)
+// opens: 여는 조건. after 가게가 lv 레벨이 되면 그 가게의 지갑에서 price를 내고 연다.
+export const SHOP_TYPES = {
+  bunsik: { name: '분식', icon: 'f_tteok', maker: { name: '화구', sprite: 'stove' } },
+  cafe: { name: '카페', icon: 'f_latte', maker: { name: '커피 머신', sprite: 'espresso' }, opens: { after: 'bunsik', lv: 12, price: 15000 } },
+};
 export const FIRST_SHOP = 'bunsik';
+// 메뉴·가구·바닥·벽지가 딸린 가게
+export const shopOf = item => item.shop || FIRST_SHOP;
+export const SHOP_NAME_MAX = 12;
+// 가게마다 파는 메뉴
+export const SHOP_RECIPES = Object.fromEntries(Object.keys(SHOP_TYPES).map(type => [type, RECIPES.filter(r => shopOf(r) === type)]));
+// 그 가게에서 본 가구 정보. 요리 기구(stove)만 가게마다 이름과 그림이 다르다.
+const MAKERS = Object.fromEntries(Object.entries(SHOP_TYPES).map(([type, shop]) => [type, { ...FURN.stove, ...shop.maker }]));
+export const furnIn = (shopType, id) => (id === 'stove' ? MAKERS[shopType] : FURN[id]);
 
 // 처음 가게의 크기와 문 자리(왼쪽에서 0부터 센 칸)
 export const START_ROWS = 6;

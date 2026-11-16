@@ -1,5 +1,5 @@
 // 캔버스 그리기. 논리 해상도(1칸 = 16px)로 그리고, 확대는 CSS가 한다.
-import { G, MAX_COLS, TREAT_TIME, cookState, patienceLeft, recipeOf, petById } from './game.js';
+import { G, MAX_COLS, TREAT_TIME, cookState, patienceLeft, recipeOf, petById, furnOf } from './game.js';
 import { FURN, FLOORS, WALLS, PETS, PHOTO_W, PHOTO_H, START_DOOR } from './data.js';
 import { skyAt, skyCSS, drawView } from './sky.js';
 
@@ -14,6 +14,8 @@ const WINDOW_X = PAD + 4, WINDOW_Y = 6, PET_FRAME_X = PAD + 38;
 const wallShift = s => (s.door - START_DOOR) * TILE;
 // 큰 액자는 누르면 사진을 고를 수 있어서 자리를 밖에서도 쓴다.
 export const photoRect = s => ({ x: PAD + 62 + wallShift(s), y: 4, w: 28, h: 24 });
+// 문은 누르면 골목(가게 고르기)으로 나간다.
+export const doorRect = s => ({ x: PAD + s.door * TILE, y: WALL_H - 24, w: TILE, h: 24 });
 const GLOW_R = 22; // 밤에 조명이 밝히는 둘레의 반지름
 
 const INK = '#3b2b2b';
@@ -54,6 +56,12 @@ const FLOOR_PAINT = {
     g.fillStyle = '#b7e6da'; g.fillRect(0, 0, 16, 16);
     g.fillStyle = '#7fc4b3'; g.fillRect(15, 0, 1, 16); g.fillRect(0, 15, 16, 1);
     g.fillStyle = '#e9fbf5'; g.fillRect(7, 6, 2, 4); g.fillRect(6, 7, 4, 2);
+  },
+  parquet(g) {
+    g.fillStyle = '#d2a070'; g.fillRect(0, 0, 16, 16);
+    g.fillStyle = '#b07a48';
+    for (const [bx, by] of [[0, 0], [8, 8]]) for (const y of [3, 7]) g.fillRect(bx, by + y, 8, 1); // 가로로 놓인 널
+    for (const [bx, by] of [[8, 0], [0, 8]]) for (const x of [3, 7]) g.fillRect(bx + x, by, 1, 8); // 세로로 놓인 널
   },
 };
 
@@ -130,6 +138,10 @@ const WALL_PAINT = {
         g.fillStyle = '#d9a03a'; g.fillRect(x + 6, y + 3, 1, 1);
       }
     }
+  },
+  sage(g, w, h) {
+    g.fillStyle = '#d3e2cb'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#b9cfae'; for (let x = 0; x < w; x += 8) g.fillRect(x, 0, 4, h);
   },
 };
 
@@ -327,7 +339,7 @@ export function createRenderer(canvas, atlas) {
     g.globalCompositeOperation = 'lighter';
     g.globalAlpha = sky.dark;
     for (const it of s.items) {
-      const f = FURN[it.type];
+      const f = furnOf(it.type);
       if (!f.light) continue;
       // 빛은 그림 윗부분(전등갓, 불꽃)에서 퍼진다.
       const top = WALL_H + (it.y + 1) * TILE - atlas[f.sprite].height;
@@ -338,13 +350,13 @@ export function createRenderer(canvas, atlas) {
   }
 
   function drawItem(it, time) {
-    const f = FURN[it.type];
+    const f = furnOf(it.type);
     if (it.type !== 'stove') {
       sprOnTile(f.blink && Math.floor(time * 1.5) % 2 ? f.blink : f.sprite, it.x, it.y);
       return;
     }
     const state = cookState(it);
-    sprOnTile(state === 'cooking' ? 'stove_on' : 'stove', it.x, it.y);
+    sprOnTile(state === 'cooking' ? `${f.sprite}_on` : f.sprite, it.x, it.y);
     if (state === 'cooking') {
       // 김
       const px = PAD + it.x * TILE, py = WALL_H + (it.y + 1) * TILE - 24;
@@ -465,7 +477,7 @@ export function createRenderer(canvas, atlas) {
     if (p?.kind === 'furn') {
       tileMark(p.x, p.y);
       g.globalAlpha = blink ? 0.9 : 0.6;
-      sprOnTile(FURN[p.type].sprite, p.x, p.y);
+      sprOnTile(furnOf(p.type).sprite, p.x, p.y);
       g.globalAlpha = 1;
     } else if (p?.kind === 'floor' && blink) {
       g.fillStyle = 'rgba(255,255,255,0.35)';
@@ -493,7 +505,7 @@ export function createRenderer(canvas, atlas) {
     const list = [];
     for (const it of s.items) {
       if (FURN[it.type].block) list.push({ key: it.y + 0.5, draw: () => drawItem(it, time) });
-      else sprOnTile(FURN[it.type].sprite, it.x, it.y);
+      else sprOnTile(furnOf(it.type).sprite, it.x, it.y);
     }
     if (!G.edit) {
       for (const c of w.customers) {
@@ -525,7 +537,7 @@ export function createRenderer(canvas, atlas) {
     let best = null;
     for (const it of G.state.items) {
       const x = PAD + it.x * TILE, y = WALL_H + it.y * TILE;
-      const extra = atlas[FURN[it.type].sprite].height > TILE ? 8 : 0;
+      const extra = atlas[furnOf(it.type).sprite].height > TILE ? 8 : 0;
       if (px >= x && px < x + TILE && py >= y - extra && py < y + TILE && (!best || it.y > best.y)) best = it;
     }
     return best;

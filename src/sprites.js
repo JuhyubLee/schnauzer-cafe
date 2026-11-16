@@ -133,6 +133,32 @@ def('stove_on', [...STOVE_TOP,
   'kokayyaayyaaykok',
   ...STOVE_BOTTOM], { outline: false });
 
+// 카페의 요리 기구: 커피 머신. 화구와 같은 크기의 장 위에 올라가 있다. 켜지면 불이 들어오고 커피가 내려온다.
+const ESPRESSO = (light, drip) => [
+  '................',
+  '...kkkkkkkkkk...',
+  '...kllllllllk...',
+  `...klggggg${light}lk...`,
+  '...kllllllllk...',
+  '...kgGGkkGGgk...',
+  `...kg${drip}gk...`,
+  '...kgKwwwwKgk...',
+  '...kkkkkkkkkk...',
+  'kkkkkkkkkkkkkkkk',
+  'kcccccccccccccck',
+  'kccccccccccccCCk',
+  'kkkkkkkkkkkkkkkk',
+  'kooooooooooooook',
+  'kooKKooooooKKook',
+  'kokkkkkkkkkkkkok',
+  'kokbbbbbbbbbbkok',
+  'kokbbbbbbbbbTkok',
+  'kokbbbbbbbbbbkok',
+  ...STOVE_BOTTOM,
+];
+def('espresso', ESPRESSO('G', 'KKKKKK'), { outline: false });
+def('espresso_on', ESPRESSO('r', 'KBKKBK'), { outline: false });
+
 const PLANT_ROWS = [
   '................',
   '......nn........',
@@ -411,6 +437,83 @@ const STATUE = body => [
 const GOLD = { g: PAL.y, G: PAL.Y, l: '#fff3b0', w: '#ffe58a', e: '#9a6a12', n: '#9a6a12', p: PAL.Y, q: '#fffbe6' };
 def('statue', STATUE(['.gggggwwwwwwwww.', '.ggggggwwwpwww..', '.gggggggwwwww...']), { pal: GOLD });
 def('statue_b', STATUE(['.ggqggwwwwwwwww.', '.gqqqggwwwpwww..', '.ggqggggwwwww...']), { pal: GOLD });
+
+// ───── 카페(2호점) 가구 ─────
+
+def('table_marble', TABLE_ROWS, { pal: { t: '#eef1f6', T: '#c3cad6', B: PAL.K } });
+
+def('menuboard', [
+  '................',
+  '...bbbbbbbbbb...',
+  '...bKKKKKKKKb...',
+  '...bKwwKKwwKb...',
+  '...bKKKKKKKKb...',
+  '...bKwwwwKKKb...',
+  '...bKKKKKKKKb...',
+  '...bKyyKKwwKb...',
+  '...bKKKKKKKKb...',
+  '...bbbbbbbbbb...',
+  '...bb......bb...',
+  '...b........b...',
+  '..bb........bb..',
+  '................',
+]);
+
+def('showcase', [
+  '................',
+  '..llllllllllll..',
+  '..luuuuuuuuuul..',
+  '..lurruwwuyyul..',
+  '..lurruwwuyyul..',
+  '..llllllllllll..',
+  '..luuuuuuuuuul..',
+  '..luppuBBuccul..',
+  '..luppuBBuccul..',
+  '..llllllllllll..',
+  '..tttttttttttt..',
+  '..tTTTTTTTTTTt..',
+  '..tttttttttttt..',
+  '..T..........T..',
+  '................',
+]);
+
+// 네온 간판: 컵 모양 불빛(p)이 분홍과 하늘색으로 번갈아 켜진다.
+const NEON_ROWS = [
+  '................',
+  '..KKKKKKKKKKKK..',
+  '..KKKpKKpKKKKK..',
+  '..KKKKpKKpKKKK..',
+  '..KKppppppKKKK..',
+  '..KKpKKKKppKKK..',
+  '..KKpKKKKpKpKK..',
+  '..KKpKKKKppKKK..',
+  '..KKKppppKKKKK..',
+  '..KKKKKKKKKKKK..',
+  '.......GG.......',
+  '.......GG.......',
+  '.......GG.......',
+  '.....GGGGGG.....',
+  '................',
+];
+def('neon', NEON_ROWS, { pal: { p: '#ff7ac8' } });
+def('neon_b', NEON_ROWS, { pal: { p: '#8ce0ff' } });
+
+def('piano', [
+  '................',
+  '.BBBBBBBBBBBBBB.',
+  '.BbbbbbbbbbbbbB.',
+  '.BbBBBBBBBBBBbB.',
+  '.BbBBBByyBBBBbB.',
+  '.BbbbbbbbbbbbbB.',
+  '.BBBBBBBBBBBBBB.',
+  '.wKwKwwKwKwKwww.',
+  '.wwwwwwwwwwwwww.',
+  '.BBBBBBBBBBBBBB.',
+  '.BB..........BB.',
+  '.BB....yy....BB.',
+  '.BB..........BB.',
+  '................',
+]);
 
 def('shelf', [
   'kkkkkkkkkkkkkkkk',
@@ -1177,6 +1280,158 @@ def('f_egg', [
   '................',
   '................',
   '................',
+]);
+
+// 카페(2호점) 메뉴
+def('f_latte', [
+  '................',
+  '......w..w......',
+  '.......w..w.....',
+  '................',
+  '..wwwwwwwwwww...',
+  '..wtttcctttwwll.',
+  '..wttccccttww.l.',
+  '..wtttcctttww.l.',
+  '..wwwwwwwwwwwll.',
+  '...wwwwwwwwww...',
+  '...lwwwwwwwwl...',
+  '....llllllll....',
+  '................',
+  '................',
+  '................',
+  '................',
+]);
+def('f_cookie', [
+  '................',
+  '................',
+  '................',
+  '.....tttttt.....',
+  '....ttBttttt....',
+  '...ttttttBttt...',
+  '...tBtttttttt...',
+  '...ttttBttttT...',
+  '...tttttttBTT...',
+  '....ttBtttTT....',
+  '.....TTTTTT.....',
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+]);
+def('f_croissant', [
+  '................',
+  '................',
+  '................',
+  '................',
+  '.....taaaat.....',
+  '...taaTaaTaat...',
+  '..taaTaaaaTaat..',
+  '..aaTaaaaaaTaa..',
+  '..aTTttttttTTa..',
+  '.wwTTwwwwwwTTww.',
+  ...PLATE,
+]);
+def('f_lemonade', [
+  '................',
+  '..........n.....',
+  '.........n......',
+  '....wwwwnwww....',
+  '....lyyyyyyl....',
+  '....lyywyyyl....',
+  '....lyyyywyl....',
+  '....lywyyyyl....',
+  '....lyyyyyyl....',
+  '.....lyyyyl.....',
+  '.....lyyyyl.....',
+  '.....llllll.....',
+  '................',
+  '................',
+  '................',
+  '................',
+]);
+def('f_muffin', [
+  '................',
+  '................',
+  '................',
+  '......BBBB......',
+  '....BBBbBBBB....',
+  '...BBKBBBBbBB...',
+  '...BbBBBKBBBB...',
+  '..BBBBBBBBBKBB..',
+  '..bBBKBBbBBBBb..',
+  '...cCcCcCcCcC...',
+  '...cCcCcCcCcC...',
+  '....CcCcCcCc....',
+  '....cccccccc....',
+  '................',
+  '................',
+  '................',
+]);
+def('f_pudding', [
+  '................',
+  '................',
+  '................',
+  '................',
+  '.....BBBBBB.....',
+  '....BTTTTTTB....',
+  '....yyyyyyyy....',
+  '...yyywyyyyyy...',
+  '...yyyyyyyyyY...',
+  '.wwyyyyyyyyYYww.',
+  ...PLATE,
+]);
+def('f_tart', [
+  '................',
+  '................',
+  '................',
+  '................',
+  '................',
+  '...rrynnuurry...',
+  '..trrynnuurryt..',
+  '..ttttttttttTT..',
+  '..tTtTtTtTtTtT..',
+  '.wwTTTTTTTTTTww.',
+  ...PLATE,
+]);
+def('f_cheesecake', [
+  '................',
+  '................',
+  '................',
+  '........n.......',
+  '.......rr.......',
+  '....aaaaaaaa....',
+  '...ccccccccca...',
+  '..cccccccccccc..',
+  '..ccccccccccCC..',
+  '.wwttttttttttww.',
+  ...PLATE,
+]);
+def('f_tiramisu', [
+  '................',
+  '................',
+  '................',
+  '................',
+  '...BBBBBBBBBB...',
+  '...BbBBBBbBBB...',
+  '...wwwwwwwwww...',
+  '...TTTTTTTTTT...',
+  '...wwwwwwwwwc...',
+  '.wwTTTTTTTTTTww.',
+  ...PLATE,
+]);
+def('f_shortcake', [
+  '................',
+  '........n.......',
+  '.......rrr......',
+  '.......rrr......',
+  '...wwwwwwwwww...',
+  '...wwwwwwwwww...',
+  '...yyyyyyyyyY...',
+  '...wrwwrwwrww...',
+  '...yyyyyyyyyY...',
+  '.wwYYYYYYYYYYww.',
+  ...PLATE,
 ]);
 
 // ───── 작은 아이콘 ─────

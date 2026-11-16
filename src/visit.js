@@ -5,8 +5,9 @@
 import { G, level, enterVisit, leaveVisit, save, MAX_ROWS, MAX_COLS } from './game.js';
 import { putShop, getShop, deleteShop, reportShop } from './cloud.js';
 import {
-  RECIPES, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FLOORS, WALLS, PETS, PET_SLOTS, PET_NAME_MAX,
+  CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FLOORS, WALLS, PETS, PET_SLOTS, PET_NAME_MAX,
   WEAR, START_ROWS, START_COLS, START_DOOR, LEVEL_XP, VISIT_GIFT, GIFTS_PER_DAY, STOVE_SPEED, SITE_URL, FIRST_SHOP,
+  SHOP_TYPES, SHOP_RECIPES, SHOP_NAME_MAX,
 } from './data.js';
 import { through } from './bytes.js';
 import { validIcon } from './sprites.js';
@@ -16,7 +17,6 @@ const FRIENDS_KEY = 'schnauzer-cafe-friends'; // 내 가게 저장과 따로 둔
 const MAX_FRIENDS = 12;
 const MAX_CODE = 20000; // 초대장 글자 수 한도
 const MAX_BYTES = 200000; // 압축을 푼 크기 한도
-const SHOP_NAME_MAX = 12;
 const has = Object.hasOwn;
 const int = Number.isInteger;
 
@@ -51,6 +51,7 @@ export function makeSnapshot() {
   const s = G.state;
   return {
     s: myId(),
+    t: s.type, // 가게 종류. 2호점이 생기기 전의 초대장에는 없다(분식으로 읽는다)
     n: s.shopName,
     l: level(),
     r: s.rows,
@@ -100,6 +101,8 @@ function sanitize(raw) {
   const sid = typeof raw.s === 'string' && /^[a-z0-9]{6,24}$/.test(raw.s) ? raw.s : null;
   const name = str(raw.n, SHOP_NAME_MAX);
   if (!sid || !name) return null;
+  const type = raw.t ?? FIRST_SHOP;
+  if (!has(SHOP_TYPES, type)) return null;
   if (!int(raw.l) || raw.l < 1 || raw.l > LEVEL_XP.length) return null;
   if (!int(raw.r) || raw.r < START_ROWS || raw.r > MAX_ROWS) return null;
   // 가로 칸 수(k)와 문 자리(d)가 없는 초대장은 옆으로 넓히기가 생기기 전에 만든 것이다.
@@ -140,7 +143,7 @@ function sanitize(raw) {
     if (!str(menu, CUSTOM_NAME_MAX) || !has(CUSTOM_TIERS, tier) || !validIcon(rows)) return null;
     custom.push([str(menu, CUSTOM_NAME_MAX), tier, px]);
   }
-  return { s: sid, n: name, l: raw.l, r: raw.r, k: cols, d: door, w: raw.w, f: [...raw.f], i: items, p: pets, c: custom };
+  return { s: sid, t: type, n: name, l: raw.l, r: raw.r, k: cols, d: door, w: raw.w, f: [...raw.f], i: items, p: pets, c: custom };
 }
 
 // ───── 다녀온 가게 목록, 방문 선물 ─────
@@ -197,11 +200,11 @@ function shopFrom(snap) {
   const custom = snap.c.map(([name, tier, px], i) => ({ id: `v${i + 1}`, name, tier, px: px.match(/.{16}/g) }));
   const stock = {};
   // 구경하는 동안 손님이 오가도록 그 가게 레벨에 맞는 메뉴를 넉넉히 채워 둔다.
-  for (const r of RECIPES) if (r.lv <= snap.l) stock[r.id] = 99;
+  for (const r of SHOP_RECIPES[snap.t]) if (r.lv <= snap.l) stock[r.id] = 99;
   for (const c of custom) if (CUSTOM_TIERS[c.tier].lv <= snap.l) stock[c.id] = 99;
   const home = G.state;
   return {
-    v: 1, started: true, type: FIRST_SHOP, others: [], shopName: snap.n,
+    v: 1, started: true, type: snap.t, others: [], shopName: snap.n,
     coins: 0, xp: LEVEL_XP[snap.l - 1], rows: snap.r, cols: snap.k, door: snap.d,
     items: snap.i.map(([type, x, y, lv], i) => ({ id: i + 1, type, x, y, ...(type === 'stove' ? { lv, cook: null } : {}) })),
     nextId: snap.i.length + 1,

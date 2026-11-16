@@ -4,10 +4,11 @@ import {
   G, on, level, hint, charm, seatCount, stoves, cookState, itemById, recipeOf, allRecipes, josa,
   startCook, collect, costOf, enterEdit, exitEdit, storeItem, upgradeCost, expandCfg,
   askWall, askExpand, askUpgrade, pendingInfo, confirmPending, save, reset, startGame, exportSave, importSave,
+  furnOf, levelIn, shopNo,
 } from './game.js';
 import {
   FURN, FURN_GROUPS, FLOORS, WALLS, SEASONS, EXPAND_DIRS, LEVEL_XP, PETS, BONDS, MAX_CUSTOM, APP_VERSION, PRIVACY_URL,
-  SONG_CHOICES, stoveLimit, fmtTime, onSale,
+  SONG_CHOICES, SHOP_TYPES, stoveLimit, fmtTime, onSale, shopOf,
 } from './data.js';
 import { $, esc, setText, setHTML, setSrc, copyText } from './dom.js';
 import { share } from './device.js';
@@ -18,6 +19,7 @@ import { createMenuUI } from './ui-menu.js';
 import { createVisitUI } from './ui-visit.js';
 import { createPhotoUI } from './ui-photo.js';
 import { createDailyUI } from './ui-daily.js';
+import { createAlleyUI } from './ui-alley.js';
 import { goalText } from './daily.js';
 import { sharing, stopSharing } from './visit.js';
 
@@ -28,8 +30,9 @@ export function initUI({ atlas, renderer }) {
   const petFace = pet => renderer.petURL(pet.species, pet.wear, true);
 
   $('coinIcon').src = icon('coin');
-  const navIcons = { cook: 'f_tteok', edit: 'hammer', visit: 'door', daily: 'stamp' };
+  const navIcons = { edit: 'hammer', visit: 'door', daily: 'stamp' }; // 요리 버튼 그림은 가게마다 달라서 refresh가 넣는다
   for (const [nav, name] of Object.entries(navIcons)) document.querySelector(`[data-nav="${nav}"] img`).src = icon(name);
+  const cookIcon = document.querySelector('[data-nav="cook"] img');
 
   // ── 알림 ──
   // toast: 바로 보여 주고 앞의 것을 덮는다. news: 좋은 소식(단계가 오름, 주문을 끝냄)이라 겹쳐도 하나씩 차례로 보여 준다.
@@ -96,6 +99,7 @@ export function initUI({ atlas, renderer }) {
   const visitUI = createVisitUI(kit);
   const photoUI = createPhotoUI({ ...kit, onChange: () => renderEdit() });
   const dailyUI = createDailyUI(kit);
+  const alleyUI = createAlleyUI(kit);
 
   // ── 요리 ──
   function openCook(stoveId = null) {
@@ -116,15 +120,16 @@ export function initUI({ atlas, renderer }) {
     const add = s.custom.length < MAX_CUSTOM
       ? `<button type="button" class="btn big" data-act="create">나만의 메뉴 만들기 (${s.custom.length}/${MAX_CUSTOM})</button>`
       : `<p class="muted center">나만의 메뉴를 ${MAX_CUSTOM}개 모두 만들었어요</p>`;
+    const maker = furnOf('stove').name; // 화구, 커피 머신처럼 가게마다 다르다
     openSheet('요리', `<div>${lines}</div>${rows}${add}`, {
       live() {
         stoves().forEach((st, i) => {
           const el = document.querySelector(`[data-stove="${st.id}"]`);
           if (!el) return;
           const state = cookState(st), name = st.cook && esc(recipeOf(st.cook.r).name);
-          setHTML(el, state === 'idle' ? `<span>화구 ${i + 1} · 비어 있어요</span>`
-            : state === 'cooking' ? `<span>화구 ${i + 1} · ${name} · ${fmtTime((st.cook.end - Date.now()) / 1000)} 남음</span>`
-              : `<span>화구 ${i + 1} · ${name} 완성</span><button type="button" class="btn primary" data-act="collect" data-id="${st.id}">꺼내기</button>`);
+          setHTML(el, state === 'idle' ? `<span>${maker} ${i + 1} · 비어 있어요</span>`
+            : state === 'cooking' ? `<span>${maker} ${i + 1} · ${name} · ${fmtTime((st.cook.end - Date.now()) / 1000)} 남음</span>`
+              : `<span>${maker} ${i + 1} · ${name} 완성</span><button type="button" class="btn primary" data-act="collect" data-id="${st.id}">꺼내기</button>`);
         });
         for (const el of document.querySelectorAll('[data-stock]')) {
           const r = recipeOf(el.dataset.stock);
@@ -138,7 +143,7 @@ export function initUI({ atlas, renderer }) {
         cook(el) {
           const picked = stoveId != null && itemById(stoveId);
           const target = picked && !picked.cook ? picked : stoves().find(st => !st.cook);
-          if (!target) { toast('빈 화구가 없어요. 요리가 끝나길 기다려 주세요'); sfx('err'); return; }
+          if (!target) { toast(`빈 ${josa(maker, '이', '가')} 없어요. 요리가 끝나길 기다려 주세요`); sfx('err'); return; }
           if (startCook(target.id, el.dataset.r)) { sfx('cook'); closeSheet(); }
         },
         collect(el) { collect(Number(el.dataset.id)); },
@@ -193,6 +198,7 @@ export function initUI({ atlas, renderer }) {
     const s = G.state;
     const onOff = (label, on) => `${label} ${on ? '켜짐' : '꺼짐'}`;
     openSheet('가게 설정', `<div class="stack">
+        <button type="button" class="btn big" data-act="alley">골목으로 나가기 (다른 가게)</button>
         <label class="field">가게 이름<input id="setShop" maxlength="12" value="${esc(s.shopName)}" autocomplete="off"></label>
         <button type="button" class="btn primary" data-act="name">이름 바꾸기</button>
         <p class="muted">분위기 ${charm()} · 손님 자리 ${seatCount()}개 · 만든 요리 ${s.stats.cooked}번</p>
@@ -221,6 +227,7 @@ export function initUI({ atlas, renderer }) {
         <p class="muted center">버전 ${APP_VERSION}</p>
       </div>`, {
       actions: {
+        alley() { sfx('tap'); alleyUI.open(); },
         name() {
           s.shopName = $('setShop').value.trim() || s.shopName;
           save();
@@ -239,7 +246,7 @@ export function initUI({ atlas, renderer }) {
         sound(el) { s.sound = !s.sound; el.textContent = onOff('효과음', s.sound); save(); sfx('tap'); },
         dim(el) { s.dim = !s.dim; el.textContent = onOff('밤에 가게 어둡게', s.dim); save(); sfx('tap'); },
         async backup() {
-          const code = exportSave();
+          const code = await exportSave();
           if (await copyText(code)) { toast('백업 코드를 복사했어요. 카톡에 붙여 두세요'); return; }
           $('restoreCode').value = code;
           toast('복사가 안 돼요. 아래 칸의 코드를 길게 눌러 복사해 주세요');
@@ -323,15 +330,19 @@ export function initUI({ atlas, renderer }) {
 
   function editCards() {
     const s = G.state, e = G.edit, lv = level();
+    // 가구·바닥·벽지는 그것이 딸린 가게의 레벨로 열린다. 다른 가게 것이면 몇 호점 것인지 같이 적는다.
+    const lockedAt = x => x.lv > levelIn(shopOf(x));
+    const lvLabel = x => (shopOf(x) === s.type ? `Lv ${x.lv}` : `${shopNo(shopOf(x))}호점 Lv ${x.lv}`);
     if (e.tab === 'furn') {
       const list = Object.entries(FURN).filter(([, f]) => f.group === e.group);
       if (e.group === 'season') list.sort((a, b) => onSale(b[1]) - onSale(a[1])); // 지금 파는 것을 앞에
-      return list.map(([id, f]) => {
-        const locked = f.lv > lv, have = s.inv[id] || 0;
+      return list.map(([id]) => {
+        const f = furnOf(id);
+        const locked = lockedAt(f), have = s.inv[id] || 0;
         const full = id === 'stove' && stoves().length >= stoveLimit(lv);
         const off = !have && !onSale(f); // 계절이 아니면 새로 살 수 없다. 보관해 둔 것은 놓을 수 있다.
         const stampOnly = !have && f.stamps; // 도장 가게에서 받아야 놓을 수 있다
-        const sub = off ? `${SEASONS[f.season].name} 한정` : locked ? `Lv ${f.lv}` : have ? `보관 ${have}개`
+        const sub = off ? `${SEASONS[f.season].name} 한정` : locked ? lvLabel(f) : have ? `보관 ${have}개`
           : stampOnly ? `도장 ${f.stamps}개` : full ? '지금은 최대' : coin(f.price);
         return `<button type="button" class="card ${e.place === id ? 'on' : ''}" data-act="furn" data-id="${id}" ${locked || full || off || stampOnly ? 'disabled' : ''}>
           <img class="px" src="${icon(f.sprite)}" alt=""><b>${f.name}</b><small>${sub}</small></button>`;
@@ -339,8 +350,8 @@ export function initUI({ atlas, renderer }) {
     }
     if (e.tab === 'floor') {
       return Object.entries(FLOORS).map(([id, f]) => {
-        const locked = f.lv > lv;
-        const sub = locked ? `Lv ${f.lv}` : f.price ? `칸당 ${coin(f.price)}` : '무료';
+        const locked = lockedAt(f);
+        const sub = locked ? lvLabel(f) : f.price ? `칸당 ${coin(f.price)}` : '무료';
         return `<button type="button" class="card ${e.floor === id ? 'on' : ''}" data-act="floor" data-id="${id}" ${locked ? 'disabled' : ''}>
           <img class="px" src="${renderer.floorURL(id)}" alt=""><b>${f.name}</b><small>${sub}</small></button>`;
       }).join('');
@@ -349,9 +360,9 @@ export function initUI({ atlas, renderer }) {
       const photoCard = `<button type="button" class="card" data-act="photo">
           <img class="px" src="${s.photo || icon('painting')}" alt=""><b>액자 사진</b><small>${s.photo ? '바꾸기' : '사진 걸기'}</small></button>`;
       return photoCard + Object.entries(WALLS).map(([id, w]) => {
-        const locked = w.lv > lv && !s.walls.includes(id);
+        const locked = lockedAt(w) && !s.walls.includes(id);
         const trying = e.pending?.kind === 'wall' && e.pending.id === id; // 사기 전에 벽에 미리 대 보는 중
-        const sub = s.wall === id ? '사용 중' : s.walls.includes(id) ? '바꾸기' : locked ? `Lv ${w.lv}` : coin(w.price);
+        const sub = s.wall === id ? '사용 중' : s.walls.includes(id) ? '바꾸기' : locked ? lvLabel(w) : coin(w.price);
         return `<button type="button" class="card ${trying || (s.wall === id && e.pending?.kind !== 'wall') ? 'on' : ''}" data-act="wall" data-id="${id}" ${locked ? 'disabled' : ''}>
           <img class="px" src="${renderer.wallURL(id)}" alt=""><b>${w.name}</b><small>${sub}</small></button>`;
       }).join('');
@@ -378,7 +389,7 @@ export function initUI({ atlas, renderer }) {
         <button type="button" class="btn" data-act="cancel">취소</button>`;
     }
     if (e.sel != null) {
-      const it = itemById(e.sel), f = FURN[it.type];
+      const it = itemById(e.sel), f = furnOf(it.type);
       const cost = it.type === 'stove' ? upgradeCost(it) : null;
       const buttons = it.type === 'stove'
         ? (cost != null ? `<button type="button" class="btn" data-act="upgrade">강화 ${coin(cost)}</button>` : '')
@@ -464,6 +475,7 @@ export function initUI({ atlas, renderer }) {
       setSrc($('petIcon'), petFace(first));
       setSrc($('shopIcon'), petFace(first));
     }
+    setSrc(cookIcon, icon(SHOP_TYPES[s.type].icon));
     setText($('dailyLabel'), dailyUI.label());
     const h = s.started ? hint() : '';
     $('hint').hidden = !h;
@@ -538,7 +550,7 @@ export function initUI({ atlas, renderer }) {
 
   refresh();
   return {
-    refresh, renderEdit, openCook, toast, back,
+    refresh, renderEdit, openCook, toast, back, openAlley: alleyUI.open,
     handleInvite: visitUI.handleInvite, syncShop: visitUI.syncShop, openPhoto: photoUI.open,
   };
 }

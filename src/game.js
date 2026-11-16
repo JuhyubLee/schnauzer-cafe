@@ -1,9 +1,9 @@
 // 게임 상태와 규칙. 화면(DOM, canvas)은 모른다. 바뀐 일은 on()으로 알린다.
 import {
-  RECIPES, RECIPE, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FURN_GROUPS, FLOORS, WALLS,
+  RECIPE, CUSTOM_TIERS, MAX_CUSTOM, CUSTOM_NAME_MAX, FURN, FURN_GROUPS, FLOORS, WALLS,
   PETS, PET_SLOTS, PET_NAME_MAX, WEAR, START_ROWS, START_COLS, START_DOOR, EXPANSIONS, WIDENINGS, EXPAND_DIRS,
-  STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, TREATS, TREATS_PER_DAY, SHOP_TYPES, FIRST_SHOP,
-  levelOf, stoveLimit, onSale, bondOf, dayKey,
+  STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, TREATS, TREATS_PER_DAY, SHOP_TYPES, FIRST_SHOP, SHOP_RECIPES, SHOP_NAME_MAX,
+  levelOf, stoveLimit, onSale, bondOf, dayKey, shopOf, furnIn,
 } from './data.js';
 import { CUSTOMER_LOOKS, validIcon } from './sprites.js';
 import { mirror } from './device.js';
@@ -31,11 +31,12 @@ export const emit = (evt, data) => { for (const fn of listeners[evt] || []) fn(d
 const fail = msg => { emit('toast', msg); return false; };
 const rand = n => Math.floor(Math.random() * n);
 
-function freshState() {
+// 새 가게 하나의 값(아래 SHOP_FIELDS): 요리 기구 하나, 화분, 테이블 두 벌, 100코인.
+function freshShop(type, shopName) {
   let id = 1;
-  const it = (type, x, y, extra) => ({ id: id++, type, x, y, ...extra });
+  const it = (kind, x, y, extra) => ({ id: id++, type: kind, x, y, ...extra });
   return {
-    v: 1, started: false, type: FIRST_SHOP, shopName: '',
+    type, shopName,
     coins: 100, xp: 0, rows: START_ROWS, cols: START_COLS, door: START_DOOR,
     items: [
       it('stove', 1, 0, { lv: 1, cook: null }), it('plant', 0, 0),
@@ -44,17 +45,24 @@ function freshState() {
     ],
     nextId: id,
     floor: Array(START_ROWS * START_COLS).fill('wood'),
-    wall: 'cream', walls: ['cream'],
-    inv: {}, stock: {},
-    pets: [], nextPet: 1, closet: [],
+    wall: 'cream', stock: {},
     custom: [], nextCustom: 1,
-    notes: [],
-    tut: 0, sound: true, music: true, dim: true,
-    song: 'auto', // 배경 노래(data.js의 SONG_CHOICES)
     photo: null,
     share: false, // 가게 모습을 서버에 올려 최신 모습을 보여 줄지. 가게 번호(sid)와 열쇠(skey)는 visit.js가 처음 쓸 때 채운다
-    stamps: 0, daily: null, // 도장 수와 오늘의 주문(daily.js)
     stats: { sold: 0, cooked: 0 },
+    tut: 4, // 첫 가게만 0에서 시작해 안내를 보여 준다
+  };
+}
+
+function freshState() {
+  return {
+    v: 1, started: false, ...freshShop(FIRST_SHOP, ''), tut: 0,
+    walls: ['cream'], inv: {},
+    pets: [], nextPet: 1, closet: [],
+    notes: [],
+    sound: true, music: true, dim: true,
+    song: 'auto', // 배경 노래(data.js의 SONG_CHOICES)
+    stamps: 0, daily: null, // 도장 수와 오늘의 주문(daily.js)
     others: [], // 다른 가게들(아래 '가게 여러 개')
   };
 }
@@ -256,10 +264,19 @@ function usable(s) {
       && Object.entries(p.wear).every(([slot, id]) => has(WEAR, id) && WEAR[id].slot === slot));
 }
 
-export function exportSave() {
+const toBase64 = bytes => {
   let bin = '';
-  for (const b of new TextEncoder().encode(saveText())) bin += String.fromCharCode(b);
-  return BACKUP_PREFIX + btoa(bin);
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+};
+const MAX_PLAIN_CODE = 9000; // 이보다 긴 백업 코드는 압축한다(카톡 한 번에 1만 자까지 붙는다)
+
+// 백업 코드. 가게가 하나이고 짧으면 예전 버전도 읽는 CAFE1 모양으로, 가게가 여럿이거나 길면 압축한 CAFE2 모양으로 낸다.
+export async function exportSave() {
+  const bytes = new TextEncoder().encode(saveText());
+  const plain = BACKUP_PREFIX + toBase64(bytes);
+  if ((!G.state.others.length && plain.length <= MAX_PLAIN_CODE) || typeof CompressionStream === 'undefined') return plain;
+  return PACKED_PREFIX + toBase64(await through(bytes, new CompressionStream('deflate-raw'), MAX_BACKUP_BYTES));
 }
 
 // 백업 코드 → 검사를 통과한 저장. 읽을 수 없으면 null.
@@ -291,9 +308,16 @@ export async function importSave(code) {
 // ───── 조회 ─────
 
 export const level = () => levelOf(G.state.xp);
+// 내 가게들: 지금 연 가게와 다른 가게들(이 버전이 아는 종류만).
+const myShops = (s = G.state) => [s, ...s.others.filter(o => has(SHOP_TYPES, o.type))];
+export const shopOfType = type => myShops().find(shop => shop.type === type) || null;
+export const shopNo = type => Object.keys(SHOP_TYPES).indexOf(type) + 1; // 몇 호점인지
+// 그 종류 가게의 레벨(아직 안 연 가게면 0). 가구·바닥·벽지는 그것이 딸린 가게의 레벨로 열린다.
+export const levelIn = type => { const shop = shopOfType(type); return shop ? levelOf(shop.xp) : 0; };
 // 내 가게들 가운데 가장 높은 레벨. 친구를 데려오는 조건이나 오늘의 주문 목표처럼 가게 하나에 딸리지 않은 일에 쓴다.
-export const bestLevel = (s = G.state) =>
-  Math.max(levelOf(s.xp), ...s.others.filter(o => has(SHOP_TYPES, o.type)).map(o => levelOf(o.xp)));
+export const bestLevel = (s = G.state) => Math.max(...myShops(s).map(shop => levelOf(shop.xp)));
+// 지금 가게에서 본 가구 정보(요리 기구는 가게마다 이름과 그림이 다르다)
+export const furnOf = id => furnIn(G.state.type, id);
 export const itemAt = (x, y) => G.state.items.find(i => i.x === x && i.y === y);
 export const itemById = id => G.state.items.find(i => i.id === id);
 export const petById = id => G.state.pets.find(p => p.id === id);
@@ -311,13 +335,14 @@ function customRecipes() {
   return customCache;
 }
 export const recipeOf = id => RECIPE[id] || customRecipes().get(id);
-export const allRecipes = () => [...RECIPES, ...customRecipes().values()];
+export const allRecipes = () => [...SHOP_RECIPES[G.state.type], ...customRecipes().values()];
 const inStock = () => allRecipes().filter(r => G.state.stock[r.id] > 0);
 
-// 돈도 재고도 없고 불 위에 올린 것도 없으면, 가장 싼 메뉴는 공짜로 만들 수 있다. (막히지 않게)
-const CHEAPEST = RECIPES.reduce((a, b) => (b.cost < a.cost ? b : a));
-const broke = () => G.state.coins < CHEAPEST.cost && !inStock().length && stoves().every(st => !st.cook);
-export const costOf = r => (r === CHEAPEST && broke() ? 0 : r.cost);
+// 돈도 재고도 없고 불 위에 올린 것도 없으면, 그 가게의 가장 싼 메뉴는 공짜로 만들 수 있다. (막히지 않게)
+const CHEAPEST = Object.fromEntries(Object.entries(SHOP_RECIPES).map(([type, list]) => [type, list.reduce((a, b) => (b.cost < a.cost ? b : a))]));
+const cheapest = () => CHEAPEST[G.state.type];
+const broke = () => G.state.coins < cheapest().cost && !inStock().length && stoves().every(st => !st.cook);
+export const costOf = r => (r === cheapest() && broke() ? 0 : r.cost);
 
 // 받침에 맞는 조사를 붙인다: josa('슈슈', '이', '가') → '슈슈가'
 export function josa(word, withBatchim, without) {
@@ -339,17 +364,25 @@ export function hint() {
   }
 }
 
+// 지금 가게가 lv 레벨이 되면 새로 열리는 것들
 export function unlocksAt(lv) {
-  const out = [];
-  for (const r of RECIPES) if (r.lv === lv) out.push({ icon: r.icon, text: `새 메뉴: ${r.name}` });
-  for (const f of Object.values(FURN)) if (f.lv === lv && lv > 1 && !f.season) out.push({ icon: f.sprite, text: `새 가구: ${f.name}` });
-  for (const f of Object.values(FLOORS)) if (f.lv === lv && lv > 1) out.push({ text: `새 바닥: ${f.name}` });
-  for (const w of Object.values(WALLS)) if (w.lv === lv && lv > 1) out.push({ text: `새 벽지: ${w.name}` });
+  const type = G.state.type, here = x => shopOf(x) === type, maker = furnOf('stove'), out = [];
+  for (const r of SHOP_RECIPES[type]) if (r.lv === lv) out.push({ icon: r.icon, text: `새 메뉴: ${r.name}` });
+  for (const f of Object.values(FURN)) if (here(f) && f.lv === lv && lv > 1 && !f.season) out.push({ icon: f.sprite, text: `새 가구: ${f.name}` });
+  for (const f of Object.values(FLOORS)) if (here(f) && f.lv === lv && lv > 1) out.push({ text: `새 바닥: ${f.name}` });
+  for (const w of Object.values(WALLS)) if (here(w) && w.lv === lv && lv > 1) out.push({ text: `새 벽지: ${w.name}` });
   for (const t of Object.values(CUSTOM_TIERS)) if (t.lv === lv && lv > 1) out.push({ text: `나만의 메뉴: ${t.name} 등급` });
-  if (stoveLimit(lv) > stoveLimit(lv - 1)) out.push({ icon: 'stove', text: `화구를 ${stoveLimit(lv)}개까지 놓을 수 있어요` });
-  if (PET_SLOTS.some((slot, i) => i > 0 && slot.lv === lv)) out.push({ text: '새 동물 친구를 데려올 수 있어요' });
+  if (stoveLimit(lv) > stoveLimit(lv - 1)) out.push({ icon: maker.sprite, text: `${josa(maker.name, '을', '를')} ${stoveLimit(lv)}개까지 놓을 수 있어요` });
+  // 새 친구는 가장 높은 가게 레벨로 열린다. 다른 가게가 이미 넘은 레벨이면 새 소식이 아니다.
+  const otherBest = Math.max(0, ...myShops().filter(shop => shop !== G.state).map(shop => levelOf(shop.xp)));
+  if (lv > otherBest && PET_SLOTS.some((slot, i) => i > 0 && slot.lv === lv)) out.push({ text: '새 동물 친구를 데려올 수 있어요' });
   if (EXPANSIONS[G.state.rows]?.lv === lv) out.push({ text: '가게를 위아래로 한 줄 넓힐 수 있어요' });
   if (WIDENINGS[G.state.cols]?.lv === lv) out.push({ text: '가게를 옆으로 한 줄 넓힐 수 있어요' });
+  for (const [next, shop] of Object.entries(SHOP_TYPES)) {
+    if (shop.opens?.after === type && shop.opens.lv === lv && !shopOfType(next)) {
+      out.push({ icon: shop.icon, text: `${shopNo(next)}호점 ${josa(shop.name, '을', '를')} 열 수 있어요. 문을 눌러 골목으로 나가 보세요` });
+    }
+  }
   return out;
 }
 
@@ -727,7 +760,8 @@ export function wear(petId, itemId) {
 
 export function startCook(stoveId, recipeId) {
   const s = G.state, st = itemById(stoveId), r = recipeOf(recipeId);
-  if (!st || st.cook) return fail('이 화구는 이미 요리 중이에요');
+  if (!st || st.cook) return fail(`이 ${josa(furnOf('stove').name, '은', '는')} 이미 요리 중이에요`);
+  if (!r || (!r.custom && shopOf(r) !== s.type)) return fail('이 가게에서는 만들 수 없는 메뉴예요');
   if (r.lv > level()) return fail(`레벨 ${r.lv}에 열려요`);
   const cost = costOf(r);
   if (s.coins < cost) return fail('코인이 모자라요');
@@ -834,6 +868,29 @@ export function switchShop(type) {
   return true;
 }
 
+// 새 가게를 열 수 없으면 그 까닭, 열 수 있으면 null. 여는 값은 앞 가게(opens.after)의 지갑에서 낸다.
+export function openError(type) {
+  const cfg = SHOP_TYPES[type]?.opens;
+  if (!cfg || shopOfType(type)) return '열 수 없는 가게예요';
+  const from = shopOfType(cfg.after);
+  if (!from || levelOf(from.xp) < cfg.lv) return `${shopNo(cfg.after)}호점 레벨 ${cfg.lv}에 열려요`;
+  if (from.coins < cfg.price) return `${shopNo(cfg.after)}호점의 코인이 모자라요`;
+  return null;
+}
+
+// 새 가게를 열고 그 가게로 들어간다. 열었으면 true. 새 가게는 100코인으로 처음부터 키운다.
+export function openShop(type, shopName) {
+  if (G.visit || G.edit) return false;
+  const err = openError(type);
+  if (err) return fail(err);
+  shopName = shopName.trim().slice(0, SHOP_NAME_MAX);
+  if (!shopName) return fail('가게 이름을 지어 주세요');
+  const { after, price } = SHOP_TYPES[type].opens;
+  shopOfType(after).coins -= price;
+  G.state.others.push(freshShop(type, shopName));
+  return switchShop(type);
+}
+
 function placeError(type, x, y) {
   if (!inBounds(x, y)) return '가게 밖에는 놓을 수 없어요';
   if (itemAt(x, y)) return '이미 가구가 있는 칸이에요';
@@ -842,7 +899,7 @@ function placeError(type, x, y) {
 }
 
 const stoveLimitError = type => (type === 'stove' && stoves().length >= stoveLimit(level())
-  ? `화구는 지금 ${stoveLimit(level())}개까지 놓을 수 있어요` : null);
+  ? `${josa(furnOf('stove').name, '은', '는')} 지금 ${stoveLimit(level())}개까지 놓을 수 있어요` : null);
 
 function place(type, x, y) {
   const s = G.state, f = FURN[type];
@@ -869,7 +926,7 @@ export function moveItem(id, x, y) {
 
 export function storeItem(id) {
   const s = G.state, it = itemById(id);
-  if (it.type === 'stove') return fail('화구는 옮기기만 할 수 있어요');
+  if (it.type === 'stove') return fail(`${josa(furnOf('stove').name, '은', '는')} 옮기기만 할 수 있어요`);
   s.items = s.items.filter(i => i !== it);
   s.inv[it.type] = (s.inv[it.type] || 0) + 1;
   G.edit.sel = null;
@@ -1015,11 +1072,11 @@ export function pendingInfo() {
   const p = G.edit?.pending;
   if (!p) return null;
   switch (p.kind) {
-    case 'furn': return { name: FURN[p.type].name, cost: FURN[p.type].price };
+    case 'furn': return { name: furnOf(p.type).name, cost: furnOf(p.type).price };
     case 'floor': return { name: `${FLOORS[p.id].name} ${p.tiles.length}칸`, cost: FLOORS[p.id].price * p.tiles.length };
     case 'wall': return { name: WALLS[p.id].name, cost: WALLS[p.id].price };
     case 'expand': return { name: `${EXPAND_DIRS[p.dir]} 한 줄 넓히기`, cost: expandCfg(p.dir).price };
-    default: return { name: `화구 ${itemById(p.id).lv + 1}단계로 강화`, cost: upgradeCost(itemById(p.id)) };
+    default: return { name: `${furnOf('stove').name} ${itemById(p.id).lv + 1}단계로 강화`, cost: upgradeCost(itemById(p.id)) };
   }
 }
 

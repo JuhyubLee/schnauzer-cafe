@@ -280,6 +280,7 @@ small { font-size: 14px; }
 .row .meta small { color: var(--muted); }
 .row .right { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
 .row.poor .coin { color: var(--red); }
+.row.locked { opacity: 0.6; }
 .stove-line {
   display: flex;
   align-items: center;
