@@ -16,6 +16,8 @@ const wallShift = s => (s.door - START_DOOR) * TILE;
 export const photoRect = s => ({ x: PAD + 62 + wallShift(s), y: 4, w: 28, h: 24 });
 // 문은 누르면 골목(가게 고르기)으로 나간다.
 export const doorRect = s => ({ x: PAD + s.door * TILE, y: WALL_H - 24, w: TILE, h: 24 });
+// 옷걸이를 올려다보는 손님의 말풍선은 옷걸이 위로 올린다(머리 위에 두면 옷걸이를 덮는다). 올리는 높이(px).
+export const bubbleLift = c => (c.seat.stand && c.seat.ty < c.seat.y ? 8 : 0);
 const GLOW_R = 22; // 밤에 조명이 밝히는 둘레의 반지름
 
 const INK = '#3b2b2b';
@@ -439,7 +441,7 @@ export function createRenderer(canvas, atlas) {
     }
     for (const c of [...w.customers].sort((a, b) => a.y - b.y)) {
       if (c.state !== 'wait') continue;
-      const cx = PAD + c.x * TILE + 8, headTop = WALL_H + (c.y + 1) * TILE - 5 - 17;
+      const cx = PAD + c.x * TILE + 8, headTop = WALL_H + (c.y + 1) * TILE - 5 - 17 - bubbleLift(c);
       const have = s.stock[c.order] > 0;
       const left = patienceLeft(c);
       const shake = left < 0.25 && Math.floor(time * 10) % 2 ? 1 : 0;

@@ -39,10 +39,11 @@ export const RECIPES = [
 export const RECIPE = Object.fromEntries(RECIPES.map(r => [r.id, r]));
 
 // 나만의 메뉴: 이름과 그림은 자유, 수치는 세 등급 중에서 고른다. (기본 메뉴와 같은 수치라 균형이 안 깨진다)
+// 등급 이름은 가게마다 다르다(SHOP_TYPES의 custom.tiers).
 export const CUSTOM_TIERS = {
-  quick: { name: '간단 메뉴', lv: 1, cost: 15, time: 30, n: 5, price: 6, xp: 4 },
-  meal: { name: '든든 메뉴', lv: 3, cost: 90, time: 300, n: 8, price: 24, xp: 22 },
-  special: { name: '특별 메뉴', lv: 6, cost: 220, time: 1800, n: 12, price: 42, xp: 70 },
+  quick: { lv: 1, cost: 15, time: 30, n: 5, price: 6, xp: 4 },
+  meal: { lv: 3, cost: 90, time: 300, n: 8, price: 24, xp: 22 },
+  special: { lv: 6, cost: 220, time: 1800, n: 12, price: 42, xp: 70 },
 };
 export const MAX_CUSTOM = 6;
 export const CUSTOM_NAME_MAX = 10;
@@ -252,10 +253,24 @@ export const PHOTO_MAX_CHARS = 12000;
 // make: 만드는 일을 부르는 말, unit: 물건을 세는 말
 // stand: 손님이 앉지 않고 옷걸이(rack) 옆에 서서 고르는 가게. 처음에 테이블 대신 옷걸이가 놓인다.
 // opens: 여는 조건. after 가게가 lv 레벨이 되면 그 가게의 지갑에서 price를 내고 연다.
+// custom: 나만의 메뉴를 그 가게에서 부르는 말. item: 파는 것을 부르는 말, sample: 이름 예시, tiers: 등급(CUSTOM_TIERS) 이름,
+//   templates: 고를 수 있는 밑그림(sprites.js의 ICON_TEMPLATES). 첫째가 처음에 깔려 있다.
+const FOOD_TIERS = { quick: '간단 메뉴', meal: '든든 메뉴', special: '특별 메뉴' };
 export const SHOP_TYPES = {
-  bunsik: { name: '분식', icon: 'f_tteok', make: '요리', unit: '그릇', maker: { name: '화구', sprite: 'stove' } },
-  cafe: { name: '카페', icon: 'f_latte', make: '요리', unit: '개', maker: { name: '커피 머신', sprite: 'espresso' }, opens: { after: 'bunsik', lv: 12, price: 15000 } },
-  clothes: { name: '옷가게', icon: 'f_tshirt', make: '만들기', unit: '벌', stand: true, maker: { name: '재봉틀', sprite: 'sewing' }, opens: { after: 'cafe', lv: 12, price: 20000 } },
+  bunsik: {
+    name: '분식', icon: 'f_tteok', make: '요리', unit: '그릇', maker: { name: '화구', sprite: 'stove' },
+    custom: { item: '메뉴', sample: '마라탕', tiers: FOOD_TIERS, templates: ['bowl', 'plate', 'cup', 'blank'] },
+  },
+  cafe: {
+    name: '카페', icon: 'f_latte', make: '요리', unit: '개', maker: { name: '커피 머신', sprite: 'espresso' },
+    custom: { item: '메뉴', sample: '딸기 라테', tiers: FOOD_TIERS, templates: ['cup', 'plate', 'bowl', 'blank'] },
+    opens: { after: 'bunsik', lv: 12, price: 15000 },
+  },
+  clothes: {
+    name: '옷가게', icon: 'f_tshirt', make: '만들기', unit: '벌', stand: true, maker: { name: '재봉틀', sprite: 'sewing' },
+    custom: { item: '옷', sample: '멜빵바지', tiers: { quick: '간단한 옷', meal: '멋진 옷', special: '특별한 옷' }, templates: ['shirt', 'dress', 'blank'] },
+    opens: { after: 'cafe', lv: 12, price: 20000 },
+  },
 };
 export const FIRST_SHOP = 'bunsik';
 // 메뉴·가구·바닥·벽지가 딸린 가게

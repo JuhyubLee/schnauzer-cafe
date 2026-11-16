@@ -117,9 +117,10 @@ export function initUI({ atlas, renderer }) {
         : row;
     }).join('');
     const lines = stoves().map(st => `<div class="stove-line" data-stove="${st.id}"></div>`).join('');
+    const item = SHOP_TYPES[s.type].custom.item; // 메뉴, 옷
     const add = s.custom.length < MAX_CUSTOM
-      ? `<button type="button" class="btn big" data-act="create">나만의 메뉴 만들기 (${s.custom.length}/${MAX_CUSTOM})</button>`
-      : `<p class="muted center">나만의 메뉴를 ${MAX_CUSTOM}개 모두 만들었어요</p>`;
+      ? `<button type="button" class="btn big" data-act="create">나만의 ${item} 만들기 (${s.custom.length}/${MAX_CUSTOM})</button>`
+      : `<p class="muted center">나만의 ${josa(item, '을', '를')} ${MAX_CUSTOM}개 모두 만들었어요</p>`;
     const maker = furnOf('stove').name; // 화구, 커피 머신처럼 가게마다 다르다
     openSheet(make, `<div>${lines}</div>${rows}${add}`, {
       live() {

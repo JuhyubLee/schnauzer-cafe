@@ -1883,7 +1883,7 @@ def('t_cake', [
 export const ICON_COLORS = ['w', 'c', 'y', 'a', 'o', 'r', 'R', 'p', 'n', 'N', 'u', 'b', 'B', 'l', 'g', 'K'];
 export const ICON_SIZE = 16;
 const blank = n => Array(n).fill(EMPTY);
-// 밑그림: 그릇만 그려 두고 음식은 직접 칠한다.
+// 밑그림: 그릇이나 옷 모양만 그려 두고 나머지는 직접 칠한다. 가게마다 고를 수 있는 것은 data.js의 SHOP_TYPES에 있다.
 export const ICON_TEMPLATES = {
   blank: { name: '빈 칸', rows: blank(16) },
   bowl: {
@@ -1904,6 +1904,22 @@ export const ICON_TEMPLATES = {
       '....wwwwwwww....', '....wwwwwwww....', '....wwwwwwww....', '....wwwwwwww....',
       '....wwwwwwww....', '....wwwwwwww....', '....wwwwwwww....', '....lwwwwwwl....',
       '.....llllll.....',
+      ...blank(3)],
+  },
+  shirt: {
+    name: '티셔츠',
+    rows: [...blank(2),
+      '....ww....ww....', '..wwwwwllwwwww..', '.wwwwwwwwwwwwww.', '.wwwwwwwwwwwwww.',
+      '..ww.wwwwww.ww..', '.....wwwwww.....', '.....wwwwww.....', '.....wwwwww.....',
+      '.....wwwwww.....', '.....wwwwww.....', '.....llllll.....',
+      ...blank(3)],
+  },
+  dress: {
+    name: '원피스',
+    rows: [EMPTY,
+      '.....w....w.....', '.....ww..ww.....', '.....wwwwww.....', '......wwww......',
+      '......llll......', '.....wwwwww.....', '....wwwwwwww....', '....wwwwwwww....',
+      '...wwwwwwwwww...', '...wwwwwwwwww...', '..wwwwwwwwwwww..', '..llllllllllll..',
       ...blank(3)],
   },
 };

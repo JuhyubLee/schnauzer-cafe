@@ -1,5 +1,5 @@
 // 나만의 메뉴 만들기: 이름과 등급을 정하고, 16×16 아이콘을 직접 그린다.
-import { G, level, saveCustom, deleteCustom, save } from './game.js';
+import { G, level, saveCustom, deleteCustom, save, josa } from './game.js';
 import { CUSTOM_TIERS, CUSTOM_NAME_MAX, SHOP_TYPES, fmtTime } from './data.js';
 import { PAL, ICON_COLORS, ICON_SIZE, ICON_TEMPLATES, setSprite } from './sprites.js';
 import { $, esc } from './dom.js';
@@ -16,7 +16,8 @@ export function createMenuUI({ toast, openSheet }) {
   // id가 없으면 새 메뉴. 저장하거나 지우면 onDone을 부른다.
   function openEditor(id, onDone) {
     const existing = G.state.custom.find(c => c.id === id);
-    let px = (existing ? existing.px : ICON_TEMPLATES.bowl.rows).map(row => [...row]);
+    const words = SHOP_TYPES[G.state.type].custom; // 메뉴·옷처럼 가게마다 다른 말과 밑그림
+    let px = (existing ? existing.px : ICON_TEMPLATES[words.templates[0]].rows).map(row => [...row]);
     let tier = existing ? existing.tier : 'quick';
     let color = 'r';
     const undo = [];
@@ -26,16 +27,16 @@ export function createMenuUI({ toast, openSheet }) {
     const tiers = Object.entries(CUSTOM_TIERS).map(([tid, t]) => {
       const locked = t.lv > lv;
       return `<button type="button" class="card" data-act="tier" data-id="${tid}" ${locked ? 'disabled' : ''}>
-        <b>${t.name}</b>${locked ? `<small>Lv ${t.lv}</small>`
+        <b>${words.tiers[tid]}</b>${locked ? `<small>Lv ${t.lv}</small>`
     : `<small>${fmtTime(t.time)} · ${t.n}${unit}</small><small>재료 ${t.cost}</small><small>${unit}당 ${t.price}</small>`}</button>`;
     }).join('');
     const swatches = `<button type="button" class="swatch eraser" data-act="color" data-c="${ERASER}" aria-label="지우개"></button>`
       + ICON_COLORS.map(c => `<button type="button" class="swatch" data-act="color" data-c="${c}" style="background:${PAL[c]}" aria-label="${COLOR_NAMES[c]}"></button>`).join('');
-    const templates = Object.entries(ICON_TEMPLATES).map(([tid, t]) =>
-      `<button type="button" class="btn" data-act="template" data-id="${tid}">${t.name}</button>`).join('');
+    const templates = words.templates.map(tid =>
+      `<button type="button" class="btn" data-act="template" data-id="${tid}">${ICON_TEMPLATES[tid].name}</button>`).join('');
 
-    openSheet(existing ? '메뉴 고치기' : '나만의 메뉴 만들기', `
-      <label class="field">메뉴 이름<input id="menuName" maxlength="${CUSTOM_NAME_MAX}" value="${esc(existing ? existing.name : '')}" placeholder="예) 마라탕" autocomplete="off"></label>
+    openSheet(existing ? `${words.item} 고치기` : `나만의 ${words.item} 만들기`, `
+      <label class="field">${words.item} 이름<input id="menuName" maxlength="${CUSTOM_NAME_MAX}" value="${esc(existing ? existing.name : '')}" placeholder="예) ${words.sample}" autocomplete="off"></label>
       <p><b>등급</b></p>
       <div class="tiers">${tiers}</div>
       <p><b>아이콘 그리기</b></p>
@@ -53,7 +54,7 @@ export function createMenuUI({ toast, openSheet }) {
       <hr>
       <div class="pair">
         <button type="button" class="btn primary" data-act="keep">저장</button>
-        ${existing ? '<button type="button" class="btn danger" data-act="remove">메뉴 지우기</button>' : ''}
+        ${existing ? `<button type="button" class="btn danger" data-act="remove">${words.item} 지우기</button>` : ''}
       </div>`, {
       actions: {
         tier(el) { tier = el.dataset.id; mark(); },
@@ -65,7 +66,7 @@ export function createMenuUI({ toast, openSheet }) {
           if (!saveCustom({ id, name, tier, px: px.map(row => row.join('')) })) return;
           save();
           sfx('done');
-          toast(`${name.trim()} 메뉴를 저장했어요`);
+          toast(`${josa(name.trim(), '을', '를')} 저장했어요`);
           onDone();
         },
         remove(el) {

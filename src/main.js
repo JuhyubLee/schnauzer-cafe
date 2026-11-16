@@ -5,7 +5,7 @@ import {
 } from './game.js';
 import { fmtTime } from './data.js';
 import { buildAtlas, setSprite } from './sprites.js';
-import { createRenderer, viewW, viewH, tileAt, TILE, PAD, WALL_H, photoRect, doorRect } from './render.js';
+import { createRenderer, viewW, viewH, tileAt, TILE, PAD, WALL_H, photoRect, doorRect, bubbleLift } from './render.js';
 import { initUI } from './ui.js';
 import { sfx, resetAudio } from './sfx.js';
 import { syncMusic } from './music.js';
@@ -62,9 +62,9 @@ function playTap(p) {
   let best = null, bestD = Infinity;
   for (const c of w.customers) {
     if (c.state !== 'wait') continue;
-    const x = PAD + c.x * TILE, y = WALL_H + c.y * TILE;
-    if (!inRect(p, x - 3, y - 30, TILE + 6, 30 + TILE)) continue;
-    const d = Math.hypot(p.x - (x + 8), p.y - (y - 6));
+    const x = PAD + c.x * TILE, y = WALL_H + c.y * TILE, up = 30 + bubbleLift(c);
+    if (!inRect(p, x - 3, y - up, TILE + 6, up + TILE)) continue;
+    const d = Math.hypot(p.x - (x + 8), p.y - (y - 6 - bubbleLift(c)));
     if (d < bestD) { best = c; bestD = d; }
   }
   if (best) { serve(best, true); return; }

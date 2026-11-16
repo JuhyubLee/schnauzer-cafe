@@ -377,11 +377,12 @@ export function hint() {
 // 지금 가게가 lv 레벨이 되면 새로 열리는 것들
 export function unlocksAt(lv) {
   const type = G.state.type, here = x => shopOf(x) === type, maker = furnOf('stove'), out = [];
-  for (const r of SHOP_RECIPES[type]) if (r.lv === lv) out.push({ icon: r.icon, text: `새 메뉴: ${r.name}` });
+  const words = SHOP_TYPES[type].custom;
+  for (const r of SHOP_RECIPES[type]) if (r.lv === lv) out.push({ icon: r.icon, text: `새 ${words.item}: ${r.name}` });
   for (const f of Object.values(FURN)) if (here(f) && f.lv === lv && lv > 1 && !f.season) out.push({ icon: f.sprite, text: `새 가구: ${f.name}` });
   for (const f of Object.values(FLOORS)) if (here(f) && f.lv === lv && lv > 1) out.push({ text: `새 바닥: ${f.name}` });
   for (const w of Object.values(WALLS)) if (here(w) && w.lv === lv && lv > 1) out.push({ text: `새 벽지: ${w.name}` });
-  for (const t of Object.values(CUSTOM_TIERS)) if (t.lv === lv && lv > 1) out.push({ text: `나만의 메뉴: ${t.name} 등급` });
+  for (const [id, t] of Object.entries(CUSTOM_TIERS)) if (t.lv === lv && lv > 1) out.push({ text: `나만의 ${words.item}: ${words.tiers[id]} 등급` });
   if (stoveLimit(lv) > stoveLimit(lv - 1)) out.push({ icon: maker.sprite, text: `${josa(maker.name, '을', '를')} ${stoveLimit(lv)}개까지 놓을 수 있어요` });
   // 새 친구는 가장 높은 가게 레벨로 열린다. 다른 가게가 이미 넘은 레벨이면 새 소식이 아니다.
   const otherBest = Math.max(0, ...myShops().filter(shop => shop !== G.state).map(shop => levelOf(shop.xp)));
@@ -822,14 +823,14 @@ export function collect(stoveId) {
 
 // 새로 만들거나(id 없음) 고친다. 성공하면 메뉴 id.
 export function saveCustom({ id, name, tier, px }) {
-  const s = G.state;
+  const s = G.state, words = SHOP_TYPES[s.type].custom;
   name = name.trim().slice(0, CUSTOM_NAME_MAX);
-  if (!name) return fail('메뉴 이름을 적어 주세요');
+  if (!name) return fail(`${words.item} 이름을 적어 주세요`);
   if (!validIcon(px) || px.join('').replace(/\./g, '').length < 12) return fail('그림을 조금 더 그려 주세요');
-  if (CUSTOM_TIERS[tier].lv > level()) return fail(`${CUSTOM_TIERS[tier].name} 등급은 레벨 ${CUSTOM_TIERS[tier].lv}부터 쓸 수 있어요`);
+  if (CUSTOM_TIERS[tier].lv > level()) return fail(`${words.tiers[tier]} 등급은 레벨 ${CUSTOM_TIERS[tier].lv}부터 쓸 수 있어요`);
   let c = s.custom.find(c => c.id === id);
   if (!c) {
-    if (s.custom.length >= MAX_CUSTOM) return fail(`나만의 메뉴는 ${MAX_CUSTOM}개까지 만들 수 있어요`);
+    if (s.custom.length >= MAX_CUSTOM) return fail(`나만의 ${josa(words.item, '은', '는')} ${MAX_CUSTOM}개까지 만들 수 있어요`);
     c = { id: `c${s.nextCustom++}` };
     s.custom.push(c);
   }
@@ -841,7 +842,7 @@ export function saveCustom({ id, name, tier, px }) {
 
 export function deleteCustom(id) {
   const s = G.state, w = G.world;
-  if (stoves().some(st => st.cook?.r === id)) return fail('만드는 중인 메뉴는 지울 수 없어요');
+  if (stoves().some(st => st.cook?.r === id)) return fail('만드는 중인 것은 지울 수 없어요');
   // 이 메뉴를 먹던 손님은 계산하고, 기다리던 손님은 다른 메뉴를 고른다.
   for (const c of w.customers) if (c.order === id && c.state === 'eat') { pay(c); leave(c); }
   s.custom = s.custom.filter(c => c.id !== id);
