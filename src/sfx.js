@@ -14,16 +14,20 @@ const SOUNDS = {
   err: [[160, 0.12]],
 };
 
-// 동물 친구의 목소리. 종마다 다르다. 한 번 우는 동안 음 높이가 f의 처음 → 가운데 → 끝으로 미끄러진다(가운데는 길이의 30% 지점).
-// wave: 소리 결, dur: 한 번 우는 길이(초), gap: 다음 울음까지 쉬는 시간(초), times: 우는 횟수, vol: 크기
+// 동물 친구의 목소리. 종마다 다르다. 톱니 소리(목청)를 입 모양의 울림 두 개에 통과시켜 만든다.
+// 맨 소리 그대로면 삑 하는 효과음처럼 들리고 폰 스피커에서 잘 안 들려서(2026-11-16 사용자: "짖는 소리가 안 들려") 이렇게 바꿨다.
+// f: 목청의 높이(Hz) [처음, 가운데, 끝]. 한 번 우는 동안 미끄러진다(가운데는 길이의 30% 지점).
+// mouth: 입 모양의 울림 [[높이(Hz) 또는 [처음, 가운데, 끝], 세기], …]. 폰 스피커가 잘 내는 600~2500Hz에 둔다.
+// rough: 첫머리의 거친 숨(개가 짖을 때). attack: 소리가 커지는 시간(초). 개는 탁 터지고 고양이는 천천히 커진다.
+// dur: 한 번 우는 길이(초), gap: 다음 울음까지 쉬는 시간(초), times: 우는 횟수, vol: 크기(.omp/voice-check.js로 잰 값에 맞췄다)
 const VOICES = {
-  schnauzer: { wave: 'sawtooth', f: [210, 300, 150], dur: 0.11, gap: 0.08, times: 2, vol: 0.07 }, // 굵게 두 번
-  maltese: { wave: 'square', f: [820, 1050, 760], dur: 0.055, gap: 0.045, times: 2, vol: 0.04 }, // 높고 빠르게 앙앙
-  shiba: { wave: 'sawtooth', f: [380, 520, 300], dur: 0.13, gap: 0.1, times: 1, vol: 0.06 }, // 짧게 한 번
-  poodle: { wave: 'square', f: [520, 700, 880], dur: 0.07, gap: 0.05, times: 2, vol: 0.04 }, // 끝이 올라가는 통통 튀는 소리
-  cheese: { wave: 'triangle', f: [560, 840, 600], dur: 0.4, gap: 0.12, times: 1, vol: 0.12 }, // 야옹
-  tuxedo: { wave: 'triangle', f: [430, 640, 420], dur: 0.5, gap: 0.12, times: 1, vol: 0.13 }, // 낮고 느긋한 야옹
-  graycat: { wave: 'triangle', f: [760, 1080, 820], dur: 0.28, gap: 0.1, times: 1, vol: 0.11 }, // 높고 짧은 냐옹
+  schnauzer: { f: [300, 330, 190], mouth: [[650, 1], [1300, 0.6]], rough: 0.5, attack: 0.01, dur: 0.16, gap: 0.09, times: 2, vol: 0.42 }, // 굵게 웡웡
+  maltese: { f: [640, 700, 470], mouth: [[1100, 1], [2300, 0.6]], rough: 0.4, attack: 0.008, dur: 0.09, gap: 0.06, times: 2, vol: 0.6 }, // 높고 빠르게 앙앙
+  shiba: { f: [430, 470, 290], mouth: [[800, 1], [1700, 0.6]], rough: 0.5, attack: 0.01, dur: 0.18, gap: 0.1, times: 1, vol: 0.5 }, // 짧게 한 번 왕
+  poodle: { f: [500, 560, 620], mouth: [[950, 1], [1900, 0.6]], rough: 0.4, attack: 0.008, dur: 0.1, gap: 0.05, times: 2, vol: 0.55 }, // 끝이 올라가는 통통 튀는 소리
+  cheese: { f: [520, 780, 540], mouth: [[[800, 1300, 700], 1], [[1700, 2300, 1300], 0.5]], attack: 0.08, dur: 0.45, gap: 0.12, times: 1, vol: 0.5 }, // 야옹
+  tuxedo: { f: [400, 610, 390], mouth: [[[700, 1100, 600], 1], [[1500, 2000, 1100], 0.5]], attack: 0.1, dur: 0.55, gap: 0.12, times: 1, vol: 0.48 }, // 낮고 느긋한 야옹
+  graycat: { f: [700, 1020, 780], mouth: [[[1000, 1500, 900], 1], [[2000, 2600, 1600], 0.5]], attack: 0.06, dur: 0.3, gap: 0.1, times: 1, vol: 0.52 }, // 높고 짧은 냐옹
 };
 
 let ctx = null;
@@ -67,25 +71,67 @@ export function sfx(name) {
   }
 }
 
+// 0.2초짜리 흰 소음. 짖는 첫머리의 거친 숨에 쓴다. 오디오 장치마다 한 번 만든다.
+const noises = new WeakMap();
+function noiseOf(ac) {
+  if (!noises.has(ac)) {
+    const buf = ac.createBuffer(1, Math.round(ac.sampleRate * 0.2), ac.sampleRate), data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    noises.set(ac, buf);
+  }
+  return noises.get(ac);
+}
+
+// 값을 처음 → 가운데(길이의 30%) → 끝으로 미끄러뜨린다. 숫자 하나면 그 값 그대로다.
+function slide(param, value, t, dur) {
+  const [from, mid, to] = Array.isArray(value) ? value : [value, value, value];
+  param.setValueAtTime(from, t);
+  param.exponentialRampToValueAtTime(mid, t + dur * 0.3);
+  param.exponentialRampToValueAtTime(to, t + dur);
+}
+
+// 한 번 운다(t부터 v.dur초 동안).
+function cry(ac, v, t) {
+  const end = t + v.dur, out = ac.createGain();
+  out.gain.setValueAtTime(0.0001, t);
+  out.gain.linearRampToValueAtTime(v.vol, t + v.attack);
+  out.gain.setValueAtTime(v.vol, t + v.dur * 0.5);
+  out.gain.exponentialRampToValueAtTime(0.0001, end);
+  out.connect(ac.destination);
+  const osc = ac.createOscillator();
+  osc.type = 'sawtooth';
+  slide(osc.frequency, v.f, t, v.dur);
+  for (const [freq, amp] of v.mouth) {
+    const band = ac.createBiquadFilter(), part = ac.createGain();
+    band.type = 'bandpass';
+    band.Q.value = 5;
+    slide(band.frequency, freq, t, v.dur);
+    part.gain.value = amp;
+    osc.connect(band).connect(part).connect(out);
+  }
+  osc.start(t);
+  osc.stop(end);
+  if (!v.rough) return;
+  const src = ac.createBufferSource(), band = ac.createBiquadFilter(), part = ac.createGain();
+  src.buffer = noiseOf(ac);
+  band.type = 'bandpass';
+  band.frequency.value = v.mouth[1][0];
+  band.Q.value = 1.5;
+  part.gain.setValueAtTime(v.rough, t);
+  part.gain.exponentialRampToValueAtTime(0.0001, t + Math.min(0.06, v.dur));
+  src.connect(band).connect(part).connect(out);
+  src.start(t);
+  src.stop(end);
+}
+
 // 동물 친구가 운다. excited면 한 번 더 운다(좋아하는 간식을 먹었을 때).
 export function voice(species, excited = false) {
   if (!G.state.sound) return;
   const ac = audioCtx(), v = VOICES[species];
   if (!ac || !v) return;
-  const [from, mid, to] = v.f;
   let t = ac.currentTime;
   for (let i = 0; i < v.times + (excited ? 1 : 0); i++) {
-    const osc = ac.createOscillator(), gain = ac.createGain();
-    osc.type = v.wave;
-    osc.frequency.setValueAtTime(from, t);
-    osc.frequency.exponentialRampToValueAtTime(mid, t + v.dur * 0.3);
-    osc.frequency.exponentialRampToValueAtTime(to, t + v.dur);
-    gain.gain.setValueAtTime(0.001, t);
-    gain.gain.exponentialRampToValueAtTime(v.vol, t + v.dur * 0.15);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + v.dur);
-    osc.connect(gain).connect(ac.destination);
-    osc.start(t);
-    osc.stop(t + v.dur);
+    cry(ac, v, t);
     t += v.dur + v.gap;
   }
 }
