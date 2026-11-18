@@ -7,9 +7,9 @@ import { FURN, SHOP_TYPES, fmtTime } from './data.js';
 import { buildAtlas, setSprite } from './sprites.js';
 import { createRenderer, viewW, viewH, tileAt, TILE, PAD, WALL_H, photoRect, doorRect, bubbleLift } from './render.js';
 import { initUI } from './ui.js';
-import { sfx, resetAudio } from './sfx.js';
+import { sfx, leaveAudio, enterAudio, renewAudio, audioStuck } from './sfx.js';
 import { syncMusic } from './music.js';
-import { restoreMirrored, onBack } from './device.js';
+import { restoreMirrored, onBack, onActive } from './device.js';
 
 // 앱에서는 웹 저장소가 지워졌을 때 기기 저장소의 사본으로 되살린 다음 불러온다.
 await restoreMirrored('schnauzer-cafe-');
@@ -135,17 +135,47 @@ canvas.addEventListener('pointerup', e => {
 });
 canvas.addEventListener('pointercancel', () => { press = null; });
 
-// ── 음악: 브라우저가 화면을 한 번 누른 뒤에야 소리를 허락하므로, 누를 때마다 맞춰 본다 ──
-document.addEventListener('pointerdown', syncMusic);
+// ── 소리 장치: 화면을 떠나면 닫고, 돌아오면 새로 만든다 ──
+// 아이폰에서는 화면이 다시 보이고 0.3~0.7초 뒤에야 앱이 켜지는데, 그 전에 만든 장치는 소리가 안 난다(다시 해 주지도 않는다).
+// 그래서 돌아온 뒤 조금 기다렸다가 만든다. 화면이 눌렸다면 앱이 켜진 것이니 기다리지 않는다.
+const BACK_MS = 1000; // 화면이 다시 보인 뒤 기다리는 시간
+const ACTIVE_MS = 300; // 앱이 켜졌다고 알려 온 뒤 기다리는 시간
+const AUTO_RENEWS = 2; // 먹통인 장치를 누르지 않아도 새로 만들어 보는 횟수. 그 뒤로는 화면을 누를 때 다시 해 본다
+let backTimer = 0, renews = AUTO_RENEWS;
 
-// ── 화면을 떠날 때 저장하고, 공유 중이면 바뀐 가게 모습을 서버에 올린다. 돌아오면 소리를 다시 켠다 ──
+// 장치를 쓸 수 있게 되는 대로 음악을 맞춘다. 닫히는 중인 장치가 없으면 바로 맞춘다(누른 순간에 켜야 하는 브라우저가 있다).
+const reopen = ready => { syncMusic(); ready.then(syncMusic); };
+function audioAway() {
+  clearTimeout(backTimer);
+  backTimer = 0;
+  leaveAudio();
+  syncMusic();
+}
+function audioOpen() {
+  clearTimeout(backTimer);
+  backTimer = 0;
+  renews = AUTO_RENEWS;
+  reopen(enterAudio());
+}
+function audioBack(ms) {
+  clearTimeout(backTimer);
+  backTimer = setTimeout(audioOpen, ms);
+}
+// 먹통이 된 장치는 버리고 새로 만든다(매 프레임 부르지 않고 화면 글자를 고칠 때 같이 본다).
+function checkAudio() {
+  if (document.hidden || backTimer || renews <= 0 || !audioStuck()) return;
+  renews--;
+  reopen(renewAudio());
+}
+document.addEventListener('pointerdown', audioOpen);
+onActive(active => (active ? audioBack(ACTIVE_MS) : audioAway()));
+
+// ── 화면을 떠날 때 저장하고, 공유 중이면 바뀐 가게 모습을 서버에 올린다 ──
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
     if (G.state.started) { save(); ui.syncShop(true); }
-  } else {
-    resetAudio(); // 다른 앱에 다녀오는 동안 끊긴 오디오 장치를 새로 만들게 한다
-  }
-  syncMusic();
+    audioAway();
+  } else audioBack(BACK_MS);
 });
 window.addEventListener('pagehide', () => { if (G.state.started) save(); });
 
@@ -167,7 +197,7 @@ function frame(now) {
   last = now;
   tick(dt);
   renderer.draw();
-  if ((uiT += dt) > 0.25) { uiT = 0; ui.refresh(); }
+  if ((uiT += dt) > 0.25) { uiT = 0; ui.refresh(); checkAudio(); }
   if (G.state.started && !G.visit && saveText() !== saved) saved = save();
   if ((syncT += dt) > SYNC_EVERY) { syncT = 0; ui.syncShop(); }
   requestAnimationFrame(frame);

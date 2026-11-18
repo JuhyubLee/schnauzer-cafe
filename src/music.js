@@ -291,11 +291,10 @@ function stopPlayer() {
 export function syncMusic() {
   const want = G.state.started && G.state.music && !document.hidden;
   const choice = SONG_CHOICES[G.state.song] ? G.state.song : 'auto';
-  const ctx = want ? audioCtx() : null; // 잠들어 있던 장치도 여기서 깨운다
-  if (want && !ctx) return;
-  // 장치가 새로 만들어졌거나 고른 노래가 바뀌었으면 연주기도 새로 만든다
-  if (player && (!want || playerCtx !== ctx || playerChoice !== choice)) stopPlayer();
-  if (want && !player) {
+  const ctx = want ? audioCtx() : null; // 잠들어 있던 장치도 여기서 깨운다. 지금 소리를 낼 수 없으면 null
+  // 장치가 없어졌거나 새로 만들어졌거나 고른 노래가 바뀌었으면 하던 연주를 멈춘다
+  if (player && (playerCtx !== ctx || playerChoice !== choice)) stopPlayer();
+  if (ctx && !player) {
     player = createPlayer(ctx, n => { const list = playlist(choice); return list[n % list.length]; });
     playerCtx = ctx;
     playerChoice = choice;

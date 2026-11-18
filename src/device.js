@@ -59,6 +59,12 @@ export function onBack(handler) {
   });
 }
 
+// 앱이 앞으로 나올 때(true)와 물러날 때(false) 알려 준다. 제어 센터나 전화처럼 화면은 그대로인데 앱이 잠깐 멈출 때도 온다.
+export function onActive(handler) {
+  if (!cap) return;
+  cap.nativeCallback('App', 'addListener', { eventName: 'appStateChange' }, state => handler(!!state?.isActive));
+}
+
 // 기기의 공유 창을 띄운다. 띄웠으면(닫은 경우 포함) true, 공유 창이 없으면 false.
 export async function share({ text, url }) {
   if (cap) {

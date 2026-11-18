@@ -31,26 +31,72 @@ const VOICES = {
 };
 
 let ctx = null;
+let away = false; // 화면을 떠나 있는 동안. 이때는 장치를 만들지 않는다
+let closing = 0; // 버렸지만 아직 닫히는 중인 장치 수
+let closed = Promise.resolve(); // 버린 장치가 모두 닫히면 끝난다
+let clock = -1, clockAt = 0; // 장치의 시계(currentTime)가 마지막으로 움직였을 때의 값과 그 시각(ms)
 
-// 효과음과 음악이 같이 쓰는 오디오 장치. 소리를 못 내는 브라우저면 null.
-// 브라우저는 화면을 한 번 누른 뒤에야 소리를 허락한다.
-// 전화가 오는 등으로 장치가 잠들거나(suspended) 끊기면(아이폰에서는 interrupted) 쓸 때마다 다시 깨운다.
+const CLOSE_WAIT = 500; // 닫기가 끝나지 않으면 이만큼(ms)만 기다린다
+const STUCK_MS = 1200; // 장치의 시계가 이만큼(ms) 멈춰 있으면 먹통으로 본다
+
+// 효과음과 음악이 같이 쓰는 오디오 장치. 지금 소리를 낼 수 없으면 null
+// (소리를 못 내는 브라우저, 화면을 떠나 있는 동안, 버린 장치가 아직 닫히는 중).
+// 브라우저는 화면을 한 번 누른 뒤에야 소리를 허락한다. 잠들어 있는 장치는 쓸 때마다 다시 깨운다.
 export function audioCtx() {
   const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return null;
-  if (!ctx || ctx.state === 'closed') ctx = new AC();
+  if (!AC || away || closing) return null;
+  if (!ctx || ctx.state === 'closed') {
+    ctx = new AC();
+    clock = -1;
+    clockAt = performance.now();
+  }
   if (ctx.state !== 'running') ctx.resume().catch(() => {});
   return ctx;
 }
 
-// 다른 앱에 다녀와서 화면으로 돌아왔을 때 부른다. 쓰던 장치를 버려서 다음에 쓸 때 새로 만들게 한다.
-// 아이폰에서는 다른 앱에 다녀오면 장치가 끊기는데, 깨워도 소리가 돌아오지 않거나 켜져 있다고 나오면서
-// 소리만 안 나는 일이 있어서, 깨우는 대신 새로 만든다. 새 장치는 앱에서는 바로, 브라우저에서는 화면을 한 번 누르면 켜진다.
-export function resetAudio() {
+// 쓰던 장치를 버린다. 다 닫힌 뒤에야 audioCtx()가 새 장치를 만든다.
+// 아이폰은 닫히지 않은 장치가 하나라도 남아 있으면 새로 만든 장치도 소리가 안 나는 일이 있다
+// (오디오 세션이 켜져 있다고 잘못 기억하는데, 마지막 장치가 닫혀야 그 기억이 지워진다).
+function drop() {
   if (!ctx) return;
   const old = ctx;
   ctx = null;
-  old.close().catch(() => {});
+  closing++;
+  const done = Promise.race([old.close().catch(() => {}), new Promise(ok => setTimeout(ok, CLOSE_WAIT))]);
+  closed = Promise.all([closed, done.then(() => { closing--; })]);
+}
+
+// 화면을 떠난다(다른 앱으로 가거나, 제어 센터·전화처럼 앱이 잠깐 멈출 때). 장치를 닫아 둔다.
+// 떠나 있는 동안 살아 있던 장치는 돌아와서 깨워도 소리가 안 나는 일이 있어서, 깨우지 않고 돌아와서 새로 만든다.
+export function leaveAudio() {
+  away = true;
+  drop();
+}
+
+// 돌아왔다. 버린 장치가 다 닫히면 끝나는 약속을 돌려준다(그 뒤부터 audioCtx()가 장치를 준다).
+// 화면을 누를 때도 부른다. 잠든 장치는 누른 순간에 깨워야 켜 주는 브라우저가 있어서, 켜질 틈을 새로 준다.
+export function enterAudio() {
+  away = false;
+  if (ctx && ctx.state !== 'running') clockAt = performance.now();
+  return closed;
+}
+
+// 먹통인 장치를 버린다. 다 닫히면 끝나는 약속을 돌려준다.
+export function renewAudio() {
+  drop();
+  return closed;
+}
+
+// 장치가 먹통인지(1초에 몇 번 부른다). 켜졌다고 나오는데 시계가 안 가거나, 깨워도 안 켜진 채 STUCK_MS가 지났으면 먹통이다.
+export function audioStuck() {
+  if (!ctx) return false;
+  const now = performance.now();
+  if (ctx.state === 'running' && ctx.currentTime !== clock) {
+    clock = ctx.currentTime;
+    clockAt = now;
+    return false;
+  }
+  return now - clockAt > STUCK_MS;
 }
 
 export function sfx(name) {
