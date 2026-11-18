@@ -65,6 +65,12 @@ export function onActive(handler) {
   cap.nativeCallback('App', 'addListener', { eventName: 'appStateChange' }, state => handler(!!state?.isActive));
 }
 
+// 짧게 한 번 떤다(쓰다듬을 때). 앱에서는 기기의 진동을, 브라우저에서는 되는 곳에서만 쓴다.
+export function buzz() {
+  if (cap) call('Haptics', 'impact', { style: 'LIGHT' }).catch(() => {});
+  else navigator.vibrate?.(10);
+}
+
 // 기기의 공유 창을 띄운다. 띄웠으면(닫은 경우 포함) true, 공유 창이 없으면 false.
 export async function share({ text, url }) {
   if (cap) {

@@ -11,7 +11,7 @@ import {
   SONG_CHOICES, SHOP_TYPES, REGULAR_EVERY, DISPLAY_BONUS, stoveLimit, fmtTime, onSale, shopOf, levelXp,
 } from './data.js';
 import { $, esc, setText, setHTML, setSrc, copyText } from './dom.js';
-import { share } from './device.js';
+import { share, buzz } from './device.js';
 import { sfx, voice } from './sfx.js';
 import { syncMusic } from './music.js';
 import { createPetUI } from './ui-pet.js';
@@ -246,7 +246,7 @@ export function initUI({ atlas, renderer }) {
         <p><b>가게 백업</b></p>
         <p class="muted">백업 코드를 카톡 '나에게 보내기'에 붙여 두면, 폰을 바꾸거나 저장이 지워져도 가게를 되살릴 수 있어요.</p>
         <button type="button" class="btn" data-act="backup">백업 코드 복사</button>
-        <label class="field">백업 코드로 되살리기<textarea id="restoreCode" rows="2" placeholder="CAFE1:로 시작하는 코드를 붙여 넣어요" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></label>
+        <label class="field">백업 코드로 되살리기<textarea id="restoreCode" rows="2" placeholder="받아 둔 백업 코드(CAFE1: 또는 CAFE2:로 시작)를 붙여 넣어요" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea></label>
         <button type="button" class="btn" data-act="restore">이 코드로 되살리기</button>
         <hr>
         <button type="button" class="btn danger" data-act="reset">처음부터 다시 하기</button>
@@ -562,6 +562,8 @@ export function initUI({ atlas, renderer }) {
   on('toast', msg => { toast(msg); sfx('err'); });
   on('sale', () => sfx('coin'));
   on('serve', () => sfx('serve'));
+  on('enter', () => sfx('bell'));
+  on('miss', () => sfx('miss'));
   on('collect', r => { sfx('done'); toast(`${r.name} ${r.n}${josa(SHOP_TYPES[G.state.type].unit, '을', '를')} 진열했어요`); });
   on('manager', ({ pet, n, coins }) => { sfx('coin'); news(`점장 ${josa(pet.name, '이', '가')} 그동안 ${n}번 팔아서 코인 ${coins}개를 벌어 놨어요`); });
   // 단골: 열 명마다 받는 감사 선물과 첫 단골만 알린다(한 명마다 알리면 너무 잦다).
@@ -569,7 +571,7 @@ export function initUI({ atlas, renderer }) {
     if (gift) { sfx('level'); news(`단골이 ${n}명이 됐어요! 감사 선물로 코인 ${gift}개를 받았어요`); }
     else if (n === 1) news('첫 단골이 생겼어요! 시킨 것을 끝까지 챙겨 주면 단골이 돼요');
   });
-  on('pet', pet => voice(pet.species));
+  on('pet', pet => { voice(pet.species); buzz(); });
   // 간식: 먼저 먹는 소리가 나고, 다 먹으면(cheer) 그 종의 목소리로 운다.
   on('feed', ({ pet, fav }) => {
     sfx('eat');

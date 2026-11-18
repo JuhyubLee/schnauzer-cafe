@@ -25,6 +25,14 @@ const INK = '#3b2b2b';
 const INK_RGB = 'rgb(59,43,43)'; // INK를 캔버스가 돌려주는 색 값으로 적은 것
 const HAT_ROOM = 3; // 모자가 동물 그림 위로 올라가는 줄 수
 const TREAT_DROP = 0.5; // 받은 간식이 입까지 내려오는 시간(초)
+// 동물 친구가 가만히 있을 때 하는 짓의 그림. 서 있는 그림의 세로줄(왼쪽이 꼬리, 오른쪽이 머리)을 몇 줄씩 아래로 내려 만든다.
+// 바닥 아래로 내려간 다리는 잘려서, 엉덩이를 내리면 앉은 모습이 되고 앞쪽을 내리면 기지개를 켜는 모습이 된다.
+const PET_POSES = {
+  sit: [2, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  sitNod: [2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], // 앉아서 긁을 때 번갈아 보여 준다
+  bow: [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+  bowLow: [0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+};
 const DIGITS = {
   0: '111101101101111', 1: '010110010010111', 2: '111001111100111', 3: '111001111001111',
   4: '101101111001001', 5: '111100111001111', 6: '111100111101111', 7: '111001001010010',
@@ -218,6 +226,32 @@ export function createRenderer(canvas, atlas) {
     if (worn.hat) ctx.drawImage(atlas[`wear_${worn.hat}${f}`], x, y - HAT_ROOM + PETS[species].hatDy);
   }
 
+  // 딴짓하는 모습(PET_POSES)의 동물 그림. 옷까지 입힌 그림을 세로줄마다 내려서 만들고, 한번 만든 것은 기억해 둔다.
+  const posed = new Map();
+  function posedPet(species, frame, worn, flip, pose) {
+    const key = [species, frame, flip, pose, worn.back, worn.body, worn.neck, worn.face, worn.hat].join('|');
+    if (!posed.has(key)) {
+      const H = atlas[`pet_${species}_${frame}`].height + HAT_ROOM;
+      posed.set(key, makeCanvas(16, H, c => {
+        petAt(c, 0, HAT_ROOM, species, frame, worn, flip);
+        const img = c.getImageData(0, 0, 16, H), px = img.data;
+        for (let x = 0; x < 16; x++) {
+          const down = PET_POSES[pose][flip ? 15 - x : x];
+          if (!down) continue;
+          for (let y = H - 1; y >= 0; y--) {
+            const to = (y * 16 + x) * 4, from = ((y - down) * 16 + x) * 4;
+            for (let k = 0; k < 4; k++) px[to + k] = y < down ? 0 : px[from + k];
+          }
+          // 바닥에 닿은 칸은 바깥선 색으로 칠해 마무리한다.
+          const foot = ((H - 1) * 16 + x) * 4;
+          if (px[foot + 3]) [px[foot], px[foot + 1], px[foot + 2]] = [59, 43, 43];
+        }
+        c.putImageData(img, 0, 0);
+      }));
+    }
+    return posed.get(key);
+  }
+
   // 음식 그림을 반 크기로 줄인 것(친구가 물고 가는 접시). 2×2칸마다 가장 많은 색을 고르고 바깥선을 다시 두른다.
   // 나만의 메뉴는 고치면 atlas의 그림이 새 것으로 바뀌므로, 그림 자체를 열쇠로 기억해 둔다.
   const minis = new WeakMap();
@@ -340,9 +374,16 @@ export function createRenderer(canvas, atlas) {
     spr('photoframe', at.x, at.y);
 
     const doorX = PAD + s.door * TILE, doorY = WALL_H - 24;
-    spr('door', doorX, doorY);
-    g.fillStyle = skyCSS(sky); g.fillRect(doorX + 4, doorY + 4, 8, 4); // 문 유리에도 바깥 하늘이 비친다
-    g.fillStyle = 'rgba(255,255,255,0.5)'; g.fillRect(doorX + 6, doorY + 5, 1, 1); g.fillRect(doorX + 5, doorY + 6, 1, 1);
+    // 손님이 드나드는 동안에는 문이 열려 있고, 그 너머로 바깥이 보인다.
+    if (G.world.customers.some(c => (c.state === 'in' || c.state === 'out') && Math.abs(c.x - s.door) < 0.5 && c.y < 0.3)) {
+      g.fillStyle = skyCSS(sky); g.fillRect(doorX + 2, doorY + 2, 12, 21);
+      g.fillStyle = '#c9b08a'; g.fillRect(doorX + 2, doorY + 19, 12, 4); // 바깥 길
+      spr('door_open', doorX, doorY);
+    } else {
+      spr('door', doorX, doorY);
+      g.fillStyle = skyCSS(sky); g.fillRect(doorX + 4, doorY + 4, 8, 4); // 문 유리에도 바깥 하늘이 비친다
+      g.fillStyle = 'rgba(255,255,255,0.5)'; g.fillRect(doorX + 6, doorY + 5, 1, 1); g.fillRect(doorX + 5, doorY + 6, 1, 1);
+    }
     const trying = pending?.kind === 'floor' ? pending : null;
     for (let y = 0; y < s.rows; y++) {
       for (let x = 0; x < s.cols; x++) {
@@ -450,7 +491,14 @@ export function createRenderer(canvas, atlas) {
     const flip = (p.dir < 0) !== (Math.floor(p.spin * 6) % 2 === 1);
     const h = atlas[`pet_${pet.species}_${frame}`].height;
     const x = Math.round(PAD + p.x * TILE), y = Math.round(WALL_H + (p.y + 1) * TILE - h - 1 + dy);
-    petAt(g, x, y, pet.species, frame, pet.wear, flip);
+    // 가만히 있을 때 하는 짓: 앉기, 기지개(천천히 숙였다가 일어난다), 긁기(앉아서 몸을 떤다)
+    const act = !napping && !walking && !p.eat && p.joy <= 0 && p.act;
+    const pose = !act ? null
+      : act.kind === 'sit' ? 'sit'
+      : act.kind === 'scratch' ? (Math.floor(time * 9) % 2 ? 'sit' : 'sitNod')
+      : Math.min(act.len - act.t, act.t) < 0.3 ? 'bow' : 'bowLow';
+    if (pose) g.drawImage(posedPet(pet.species, frame, pet.wear, flip, pose), x, y - HAT_ROOM);
+    else petAt(g, x, y, pet.species, frame, pet.wear, flip);
     if (napping) {
       const t = time % 1.6 / 1.6;
       g.globalAlpha = 1 - t;
@@ -492,6 +540,8 @@ export function createRenderer(canvas, atlas) {
           note(cx + 4, Math.round(headTop + 2 - phase * 7), 1 - phase);
         }
       }
+      // 끝내 못 받고 나가는 손님: 머리 옆에 시무룩한 표시가 따라간다.
+      if (c.state === 'out' && c.sad) spr('sad', cx + 3, headTop + 1 + (Math.floor(time * 3) % 2));
       if (c.state !== 'wait') continue;
       const have = s.stock[c.order] > 0;
       const left = patienceLeft(c);

@@ -12,7 +12,12 @@ const SOUNDS = {
   eat: [[220, 0.04], [165, 0.05], [220, 0.04], [165, 0.06]],
   level: [[523, 0.08], [659, 0.08], [784, 0.08], [1047, 0.22]],
   err: [[160, 0.12]],
+  bell: [[2093, 0.06], [2637, 0.3]], // 손님이 들어올 때 문에 달린 종
+  miss: [[330, 0.09], [247, 0.16]], // 손님이 끝내 못 받고 나갈 때
 };
+// 기본은 네모난 소리(square)를 0.05 크기로 낸다. 여기 적은 소리만 다르게 낸다 [소리 결, 크기].
+// 종과 놓친 소리는 손님마다 나므로 다른 소리보다 작게 낸다.
+const TONES = { bell: ['sine', 0.06], miss: ['square', 0.035] };
 
 // 동물 친구의 목소리. 종마다 다르다. 톱니 소리(목청)를 입 모양의 울림 두 개에 통과시켜 만든다.
 // 맨 소리 그대로면 삑 하는 효과음처럼 들리고 폰 스피커에서 잘 안 들려서(2026-11-16 사용자: "짖는 소리가 안 들려") 이렇게 바꿨다.
@@ -104,11 +109,12 @@ export function sfx(name) {
   const ac = audioCtx();
   if (!ac) return;
   let t = ac.currentTime;
+  const [wave, vol] = TONES[name] || ['square', 0.05];
   for (const [freq, dur] of SOUNDS[name]) {
     const osc = ac.createOscillator(), gain = ac.createGain();
-    osc.type = 'square';
+    osc.type = wave;
     osc.frequency.value = freq;
-    gain.gain.setValueAtTime(0.05, t);
+    gain.gain.setValueAtTime(vol, t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
     osc.connect(gain).connect(ac.destination);
     osc.start(t);

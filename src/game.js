@@ -20,6 +20,9 @@ const EAT_TIME = 5;
 const WALK_SPEED = 2.2; // 칸/초
 const PET_SPEED = 2.8;
 const PET_BOOST_TIME = 20;
+// 동물 친구가 가만히 있을 때 가끔 하는 짓 [이름, 가장 짧게, 가장 길게(초)]. 그림은 render.js의 PET_POSES.
+const PET_ACTS = [['sit', 3, 6], ['stretch', 1.8, 1.8], ['scratch', 1.6, 2.4]];
+const MEET_EVERY = 25; // 친구끼리 곁에 가서 마주 보는 일 사이의 간격(초)
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 
 // state: 저장되는 것. world: 화면에 돌아다니는 것(저장 안 함). edit: 꾸미기 중일 때만 있음.
@@ -103,7 +106,7 @@ function upgrade(s) {
 }
 
 function freshWorld() {
-  G.world = { customers: [], nextCid: 1, spawnT: 2, time: 0, floats: [], pets: [] };
+  G.world = { customers: [], nextCid: 1, spawnT: 2, time: 0, floats: [], pets: [], meetCd: MEET_EVERY / 2 };
   syncPets();
 }
 
@@ -122,6 +125,7 @@ function syncPets() {
       dir: 1, up: false, walk: 0, boost: 0, target: null, think: i * 0.15, petCd: 0,
       gift: 0, giftT: 90 + Math.random() * 120, // 물어 온 선물(코인 수)과 다음 선물까지 남은 시간(초)
       joy: 0, wag: 0, spin: 0, eat: null, // 기쁜 얼굴·꼬리 흔들기·제자리 돌기가 남은 시간(초), 먹고 있는 간식 { icon, t, fav }
+      act: null, meet: null, // 가만히 있을 때 하는 짓 { kind, t(남은 시간), len }, 마주 보러 가는 친구의 id
     };
   });
 }
@@ -562,6 +566,7 @@ function trySpawn() {
       round: 1, rounds: rounds(), // 몇 번째 주문인지, 모두 몇 번 시킬지
     });
     greet();
+    emit('enter');
     return;
   }
 }
@@ -661,7 +666,8 @@ function updateCustomers(dt) {
         const have = inStock();
         if (have.length) c.order = have[rand(have.length)].id;
       }
-      if (c.t > patience()) leave(c);
+      // 끝내 못 받으면 시무룩하게 나간다.
+      if (c.t > patience()) { c.sad = true; emit('miss'); leave(c); }
     } else if (c.state === 'eat') {
       c.t -= dt;
       if (c.t > 0 || goTry(c)) continue;
@@ -742,7 +748,7 @@ function updatePet(p, dt) {
       const path = findPath(Math.round(p.x), Math.round(p.y), near, grid);
       if (path) {
         c.claim = p.id;
-        Object.assign(p, { state: 'serve', target: c.id, path });
+        Object.assign(p, { state: 'serve', target: c.id, path, act: null, meet: null });
         return;
       }
     }
@@ -750,15 +756,32 @@ function updatePet(p, dt) {
 
   if (p.state === 'walk') {
     if (stepAlong(p, speed * 0.6, dt)) {
+      const pal = p.meet != null && w.pets.find(q => q.id === p.meet);
+      p.meet = null;
       const onBed = itemAt(p.x, p.y)?.type === 'dogbed';
       p.state = onBed ? 'nap' : 'idle';
       p.t = onBed ? 10 + Math.random() * 10 : 1 + Math.random() * 3;
+      if (pal && !onBed) meet(p, pal);
     }
     return;
   }
 
+  if (p.act) {
+    if ((p.act.t -= dt) > 0) return;
+    p.act = null;
+    p.t = 0.6 + Math.random() * 1.5;
+    return;
+  }
   p.t -= dt;
   if (p.t > 0) return;
+  p.state = 'idle'; // 낮잠을 자고 있었다면 일어난다
+  // 걸어가는 대신 가끔은 제자리에서 딴짓을 하고, 가끔은 다른 친구 곁으로 간다.
+  if (Math.random() < 0.35) {
+    const [kind, min, max] = PET_ACTS[rand(PET_ACTS.length)], len = min + Math.random() * (max - min);
+    p.act = { kind, t: len, len };
+    return;
+  }
+  if (w.meetCd <= 0 && goMeet(p, speed * 0.6)) return;
   const beds = s.items.filter(i => i.type === 'dogbed');
   const goal = beds.length && Math.random() < 0.35
     ? beds[rand(beds.length)]
@@ -766,6 +789,28 @@ function updatePet(p, dt) {
   const path = findPath(Math.round(p.x), Math.round(p.y), (x, y) => x === goal.x && y === goal.y);
   if (path && path.length && !FURN[itemAt(goal.x, goal.y)?.type]?.block) { p.state = 'walk'; p.path = path; }
   else { p.state = 'idle'; p.t = 1; }
+}
+
+// 가만히 있는 다른 친구의 바로 옆 칸으로 걸어간다. 갈 친구나 길이 없으면 false.
+function goMeet(p, speed) {
+  const w = G.world, grid = blockGrid(), C = cols();
+  const idle = w.pets.filter(q => q !== p && q.state === 'idle' && !q.eat && q.joy <= 0);
+  if (!idle.length) return false;
+  const pal = idle[rand(idle.length)];
+  const path = findPath(Math.round(p.x), Math.round(p.y), (x, y) => y === pal.y && Math.abs(x - pal.x) === 1 && !grid[y * C + x], grid);
+  if (!path) return false;
+  w.meetCd = MEET_EVERY;
+  pal.t = Math.max(pal.t, path.length / speed + 1); // 올 때까지 기다려 준다
+  if (!path.length) { meet(p, pal); return true; }
+  Object.assign(p, { state: 'walk', path, meet: pal.id });
+  return true;
+}
+
+// 옆 칸에 나란히 선 두 친구가 마주 보고 꼬리를 흔든다. 그 사이 다른 데로 가 버렸으면 아무 일도 없다.
+function meet(p, pal) {
+  if (pal.state !== 'idle' || pal.eat || pal.y !== p.y || Math.abs(pal.x - p.x) !== 1) return;
+  for (const [a, b] of [[p, pal], [pal, p]]) Object.assign(a, { dir: b.x > a.x ? 1 : -1, wag: 2.4, act: null, t: 2.4 + Math.random() });
+  G.world.floats.push({ kind: 'heart', x: (p.x + pal.x) / 2, y: p.y - 0.5, t: 0 });
 }
 
 function addLove(pet, n) {
@@ -777,7 +822,8 @@ function addLove(pet, n) {
 // 기뻐한다: 웃는 얼굴로 그동안 제자리에 있는다. 걷던 길은 멈추고, 서빙 중이면 하던 서빙을 마저 한다.
 function rejoice(p, secs) {
   p.joy = secs;
-  if (p.state === 'walk') { p.state = 'idle'; p.path = []; }
+  p.act = null;
+  if (p.state === 'walk') { p.state = 'idle'; p.path = []; p.meet = null; }
   if (p.state === 'idle') p.t = Math.max(p.t, secs);
 }
 
@@ -821,6 +867,7 @@ export function feed(petId, treatId) {
   addLove(pet, treat.love * (fav ? 2 : 1));
   p.boost = PET_BOOST_TIME * (bondOf(pet.love) >= 3 ? 2 : 1);
   p.eat = { icon: treat.icon, t: TREAT_TIME, fav };
+  p.act = null;
   if (p.state === 'nap') { p.state = 'idle'; p.t = 1; }
   bump('treat', 1);
   return true;
@@ -1287,5 +1334,6 @@ export function tick(dt) {
     trySpawn();
   }
   updateCustomers(dt);
+  w.meetCd -= dt;
   for (const p of w.pets) updatePet(p, dt);
 }

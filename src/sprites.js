@@ -803,6 +803,17 @@ def('door', [
   'kkkkkkkkkkkkkkkk',
 ], { outline: false });
 
+// 열린 문. 문짝은 안쪽 왼편으로 젖혀져 있고, 열린 자리('.')에는 render.js가 바깥 하늘과 길을 그린다.
+const DOOR_OPEN = 'kBTttk........Bk';
+def('door_open', [
+  '.kkkkkkkkkkkkkk.',
+  'kBBBBBBBBBBBBBBk',
+  ...Array(9).fill(DOOR_OPEN),
+  'kBTtyk........Bk',
+  ...Array(11).fill(DOOR_OPEN),
+  'kkkkkkkkkkkkkkkk',
+], { outline: false });
+
 // 창문. 유리(가운데 24×15, '.')는 비워 두고 render.js가 그 뒤에 시각과 계절에 맞는 바깥 풍경을 그린다.
 const winRow = (left, right) => `kb${left}bb${right}bk`;
 const WIN_BAR = `k${'b'.repeat(26)}k`;
@@ -1735,6 +1746,16 @@ def('heart', [
   '...rrr...',
   '....r....',
   '.........',
+]);
+// 끝내 못 받고 나가는 손님 머리 옆의 시무룩한 표시(물방울)
+def('sad', [
+  '.......',
+  '...u...',
+  '...u...',
+  '..uwu..',
+  '..uuU..',
+  '...U...',
+  '.......',
 ]);
 def('zzz', [
   'www..',
