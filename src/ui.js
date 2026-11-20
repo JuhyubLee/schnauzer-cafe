@@ -3,7 +3,7 @@
 import {
   G, on, level, hint, charm, seatCount, stoves, cookState, itemById, recipeOf, allRecipes, josa,
   startCook, collect, costOf, enterEdit, exitEdit, storeItem, upgradeCost, expandCfg,
-  askWall, askExpand, askUpgrade, pendingInfo, confirmPending, save, reset, startGame, exportSave, importSave,
+  askWall, askExpand, askUpgrade, askSell, furnSellPrice, pendingInfo, confirmPending, save, reset, startGame, exportSave, importSave,
   furnOf, levelIn, shopNo, rounds, regulars, setShow, displayed, priceOf,
 } from './game.js';
 import {
@@ -11,7 +11,7 @@ import {
   SONG_CHOICES, SHOP_TYPES, REGULAR_EVERY, DISPLAY_BONUS, stoveLimit, fmtTime, onSale, shopOf, levelXp,
 } from './data.js';
 import { $, esc, setText, setHTML, setSrc, copyText } from './dom.js';
-import { share, buzz } from './device.js';
+import { share } from './device.js';
 import { sfx, voice } from './sfx.js';
 import { syncMusic } from './music.js';
 import { createPetUI } from './ui-pet.js';
@@ -413,28 +413,35 @@ export function initUI({ atlas, renderer }) {
   function editInfo() {
     const e = G.edit;
     const stop = '<button type="button" class="btn" data-act="stop">그만</button>';
-    // 돈이 드는 일은 여기서 구매 확정을 눌러야 이루어진다.
+    // 돈이 드는 일과 파는 일은 여기서 확정을 눌러야 이루어진다.
     const pending = pendingInfo();
     if (pending) {
-      return `<span class="grow"><b>${pending.name}</b> · ${coin(pending.cost)}</span>
-        <button type="button" class="btn primary" data-act="buy">구매 확정</button>
+      const sell = pending.gain != null;
+      return `<span class="grow"><b>${pending.name}</b> · ${sell ? '+' : ''}${coin(sell ? pending.gain : pending.cost)}</span>
+        <button type="button" class="btn primary" data-act="buy">${sell ? '판매 확정' : '구매 확정'}</button>
         <button type="button" class="btn" data-act="cancel">취소</button>`;
     }
+    // 팔 수 있는 가구(코인으로 산 것)에는 팔기 단추가 붙는다.
+    const sellBtn = type => (furnSellPrice(type) ? `<button type="button" class="btn" data-act="sell">팔기 ${coin(furnSellPrice(type))}</button>` : '');
     if (e.sel != null) {
       const it = itemById(e.sel), f = furnOf(it.type);
       const cost = it.type === 'stove' ? upgradeCost(it) : null;
       const buttons = it.type === 'stove'
         ? (cost != null ? `<button type="button" class="btn" data-act="upgrade">강화 ${coin(cost)}</button>` : '')
-        : '<button type="button" class="btn" data-act="store">보관</button>';
+        : `<button type="button" class="btn" data-act="store">보관</button>${sellBtn(it.type)}`;
       const title = it.type === 'stove' ? `${f.name} ${it.lv}단계` : f.name;
       return `<span class="grow"><b>${title}</b> · 옮길 칸을 누르세요</span>${buttons}`;
     }
-    if (e.place) return `<span class="grow"><b>${FURN[e.place].name}</b> · 놓을 칸을 누르세요</span>${stop}`;
+    if (e.place) {
+      // 보관해 둔 것이 있으면 놓지 않고 바로 팔 수도 있다.
+      const kept = G.state.inv[e.place] > 0 ? sellBtn(e.place) : '';
+      return `<span class="grow"><b>${furnOf(e.place).name}</b> · 놓을 칸을 누르세요</span>${kept}${stop}`;
+    }
     if (e.floor) return `<span class="grow"><b>${FLOORS[e.floor].name}</b> · 칠할 칸을 누르거나 문질러요</span>${stop}`;
     if (e.tab === 'expand') return `<span class="grow">넓힐 쪽을 골라 주세요</span><span>가로 ${G.state.cols}칸 · 세로 ${G.state.rows}줄</span>`;
     // 머무는 가게(카페)에서는 분위기가 손님이 시키는 횟수를 정하므로 같이 보여 준다.
     const stay = SHOP_TYPES[G.state.type].stay ? ` · 주문 ${rounds()}번` : '';
-    return `<span class="grow">가구를 누르면 옮기거나 보관할 수 있어요</span><span>분위기 ${charm()} · 자리 ${seatCount()}개${stay}</span>`;
+    return `<span class="grow">가구를 누르면 옮기거나 보관하거나 팔 수 있어요</span><span>분위기 ${charm()} · 자리 ${seatCount()}개${stay}</span>`;
   }
 
   function renderEdit() {
@@ -485,6 +492,7 @@ export function initUI({ atlas, renderer }) {
     const e = G.edit;
     if (el.dataset.act === 'stop') Object.assign(e, { place: null, floor: null, pending: null });
     else if (el.dataset.act === 'store') storeItem(e.sel);
+    else if (el.dataset.act === 'sell') askSell(e.sel != null ? { id: e.sel } : { type: e.place });
     else if (el.dataset.act === 'upgrade') askUpgrade(e.sel);
     else if (el.dataset.act === 'buy') confirmPending();
     else if (el.dataset.act === 'cancel') e.pending = null;
@@ -564,6 +572,7 @@ export function initUI({ atlas, renderer }) {
   on('serve', () => sfx('serve'));
   on('enter', () => sfx('bell'));
   on('miss', () => sfx('miss'));
+  on('sell', ({ name, coins }) => { sfx('coin'); toast(`${josa(name, '을', '를')} 팔아서 코인 ${coins}개를 받았어요`); });
   on('collect', r => { sfx('done'); toast(`${r.name} ${r.n}${josa(SHOP_TYPES[G.state.type].unit, '을', '를')} 진열했어요`); });
   on('manager', ({ pet, n, coins }) => { sfx('coin'); news(`점장 ${josa(pet.name, '이', '가')} 그동안 ${n}번 팔아서 코인 ${coins}개를 벌어 놨어요`); });
   // 단골: 열 명마다 받는 감사 선물과 첫 단골만 알린다(한 명마다 알리면 너무 잦다).
@@ -571,7 +580,7 @@ export function initUI({ atlas, renderer }) {
     if (gift) { sfx('level'); news(`단골이 ${n}명이 됐어요! 감사 선물로 코인 ${gift}개를 받았어요`); }
     else if (n === 1) news('첫 단골이 생겼어요! 시킨 것을 끝까지 챙겨 주면 단골이 돼요');
   });
-  on('pet', pet => { voice(pet.species); buzz(); });
+  on('pet', pet => voice(pet.species));
   // 간식: 먼저 먹는 소리가 나고, 다 먹으면(cheer) 그 종의 목소리로 운다.
   on('feed', ({ pet, fav }) => {
     sfx('eat');

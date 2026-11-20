@@ -1,9 +1,11 @@
 // 동물 친구 창: 쓰다듬기, 친밀도 단계, 점장 맡기기, 간식, 옷장, 이름과 모습 바꾸기, 새 친구 데려오기.
 import {
-  G, bestLevel, petById, petPet, feed, fedToday, wear, renamePet, setSpecies, adopt, adoptSlot, save,
+  G, bestLevel, petById, petPet, feed, fedToday, wear, sellWear, renamePet, setSpecies, adopt, adoptSlot, save,
   setPost, isHere, shopOfType, shopNo, josa,
 } from './game.js';
-import { PETS, PET_NAME_MAX, WEAR, WEAR_SLOTS, SEASONS, BONDS, TREATS, TREATS_PER_DAY, SHOP_TYPES, bondOf, onSale } from './data.js';
+import {
+  PETS, PET_NAME_MAX, WEAR, WEAR_SLOTS, SEASONS, BONDS, TREATS, TREATS_PER_DAY, SHOP_TYPES, bondOf, onSale, sellPrice,
+} from './data.js';
 import { $, esc, setHTML } from './dom.js';
 import { sfx } from './sfx.js';
 
@@ -11,6 +13,7 @@ export function createPetUI({ icon, coin, toast, openSheet, closeSheet, renderer
   let current = null; // 지금 보고 있는 친구 id
   let trying = null; // 사기 전에 입혀 보는 옷 id. 같은 옷을 한 번 더 눌러야(구매 확정) 산다.
   let treating = null; // 한 번 눌러 둔 간식 id. 한 번 더 눌러야(구매 확정) 사서 준다.
+  let selling = null; // 한 번 눌러 둔 팔 옷 id. 한 번 더 눌러야(판매 확정) 판다.
 
   // 친밀도 단계와 그 단계에서 생기는 일. 창이 열려 있는 동안 바뀌므로 live에서 다시 그린다.
   function bondHTML(pet) {
@@ -34,7 +37,7 @@ export function createPetUI({ icon, coin, toast, openSheet, closeSheet, renderer
     const s = G.state;
     const pet = petById(id) || s.pets[0];
     current = pet.id;
-    if (!again) { trying = null; treating = null; }
+    if (!again) { trying = null; treating = null; selling = null; }
     const shown = trying ? { ...pet.wear, [WEAR[trying].slot]: trying } : pet.wear;
     const sideScroll = again ? [...document.querySelectorAll('#sheetBody .hscroll')].map(el => el.scrollLeft) : [];
 
@@ -67,6 +70,17 @@ export function createPetUI({ icon, coin, toast, openSheet, closeSheet, renderer
       return `<p><b>${slotName}</b></p><div class="hscroll">${cards}</div>`;
     }).join('');
 
+    // 옷 팔기: 코인으로 산 옷만 나온다(도장으로 받은 옷은 팔 수 없다).
+    const sellCards = s.closet.filter(wid => sellPrice(WEAR[wid])).map(wid => {
+      const w = WEAR[wid], sure = selling === wid;
+      return `<button type="button" class="card ${sure ? 'try' : ''}" data-act="sell" data-id="${wid}">
+        <img class="px" src="${renderer.petURL(pet.species, { [w.slot]: wid })}" alt=""><b>${w.name}</b><small>+${coin(sellPrice(w))}${sure ? '<br>판매 확정' : ''}</small></button>`;
+    }).join('');
+    const sellHTML = !sellCards ? '' : `<hr>
+      <p><b>옷 팔기</b></p>
+      <p class="muted">코인으로 산 옷은 산 값의 절반에 팔 수 있어요. 팔면 그 옷을 입고 있던 친구도 벗어요. 한 번 누르고, 한 번 더 눌러 판매 확정해야 팔려요.</p>
+      <div class="hscroll">${sellCards}</div>`;
+
     const fed = fedToday(pet), full = fed >= TREATS_PER_DAY;
     const treats = Object.entries(TREATS).map(([tid, t]) => {
       const fav = PETS[pet.species].fav === tid, buying = treating === tid;
@@ -97,7 +111,8 @@ export function createPetUI({ icon, coin, toast, openSheet, closeSheet, renderer
       <label class="field">이름<input id="petName" maxlength="${PET_NAME_MAX}" value="${esc(pet.name)}" autocomplete="off"></label>
       <button type="button" class="btn" data-act="rename">이름 바꾸기</button>
       <p><b>모습 바꾸기</b></p>
-      <div class="hscroll">${speciesCards(pet.species, pet.wear, 'species')}</div>`, {
+      <div class="hscroll">${speciesCards(pet.species, pet.wear, 'species')}</div>
+      ${sellHTML}`, {
       keepScroll: again,
       live() { setHTML($('petBond'), bondHTML(pet)); },
       actions: {
@@ -116,6 +131,7 @@ export function createPetUI({ icon, coin, toast, openSheet, closeSheet, renderer
           if (treating !== tid) {
             treating = tid;
             trying = null;
+            selling = null;
             sfx('tap');
             openPets(pet.id, true);
             return;
@@ -132,6 +148,7 @@ export function createPetUI({ icon, coin, toast, openSheet, closeSheet, renderer
           if (!s.closet.includes(wid) && trying !== wid) {
             trying = wid;
             treating = null;
+            selling = null;
             sfx('tap');
             openPets(pet.id, true);
             return;
@@ -142,6 +159,19 @@ export function createPetUI({ icon, coin, toast, openSheet, closeSheet, renderer
           changed();
         },
         species(el) { setSpecies(pet.id, el.dataset.id); sfx('place'); changed(); },
+        sell(el) {
+          const wid = el.dataset.id;
+          if (selling !== wid) {
+            selling = wid;
+            trying = null;
+            treating = null;
+            sfx('tap');
+            openPets(pet.id, true);
+            return;
+          }
+          selling = null;
+          if (sellWear(wid)) changed(); else openPets(pet.id, true);
+        },
         rename() {
           if (!renamePet(pet.id, $('petName').value)) return;
           toast('이름을 바꿨어요');

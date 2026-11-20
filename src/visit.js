@@ -62,7 +62,11 @@ export function makeSnapshot() {
     i: s.items.map(it => (it.type === 'stove' ? [it.type, it.x, it.y, it.lv] : [it.type, it.x, it.y])),
     // 얼굴과 등은 1.3.0부터 붙는다. 그 전 초대장에는 없다.
     // 점장으로 다른 가게에 가 있는 친구는 이 가게 모습에 담지 않는다
-    p: s.pets.filter(isHere).map(p => [p.species, p.name, p.wear.hat || '', p.wear.neck || '', p.wear.body || '', p.wear.face || '', p.wear.back || '']),
+    // 나중에 더한 종(PETS의 like가 있는 종)은 앞에 닮은 예전 종을 적고 진짜 종을 맨 뒤에 덧붙인다(예전 앱도 읽을 수 있게)
+    p: s.pets.filter(isHere).map(p => {
+      const like = PETS[p.species].like;
+      return [like || p.species, p.name, p.wear.hat || '', p.wear.neck || '', p.wear.body || '', p.wear.face || '', p.wear.back || '', ...(like ? [p.species] : [])];
+    }),
     c: s.custom.map(c => [c.name, c.tier, c.px.join('')]),
   };
 }
@@ -128,7 +132,9 @@ function sanitize(raw) {
   const pets = [];
   for (const p of raw.p) {
     if (!Array.isArray(p)) return null;
-    const [species, petName, hat, neck, body, face = '', back = ''] = p;
+    // 맨 뒤(real)에 진짜 종이 덧붙어 있고 내가 아는 종이면 그것을, 아니면 앞에 적힌 종을 쓴다.
+    const [shown, petName, hat, neck, body, face = '', back = '', real] = p;
+    const species = has(PETS, real) ? real : shown;
     const worn = { hat, neck, body, face, back };
     if (!has(PETS, species) || !str(petName, PET_NAME_MAX)) return null;
     for (const [slot, id] of Object.entries(worn)) if (id !== '' && !(has(WEAR, id) && WEAR[id].slot === slot)) return null;

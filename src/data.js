@@ -60,6 +60,9 @@ export const SEASONS = {
 };
 // 계절 한정이 아니거나(season 없음) 지금이 그 계절이면 살 수 있다.
 export const onSale = (thing, date = new Date()) => !thing.season || SEASONS[thing.season].months.includes(date.getMonth() + 1);
+// 되팔기: 코인으로 산 가구와 옷은 산 값에 이 비율을 곱한 값에 판다. 도장으로 받은 것은 값이 없어서 팔 수 없다(0).
+export const SELL_RATE = 0.5;
+export const sellPrice = thing => (thing.stamps || !thing.price ? 0 : Math.floor(thing.price * SELL_RATE));
 
 // 설정에서 고르는 배경 노래. 곡과 '계절에 맞춰'의 규칙은 music.js에 있다.
 export const SONG_CHOICES = {
@@ -122,11 +125,21 @@ export const FURN = {
 // 동물 친구. id는 sprites.js의 PET_PAL과 같아야 한다.
 // hatDy: 머리 높이가 달라서 모자를 몇 줄 내려(+) 또는 올려(-) 씌울지. nick: 이름을 안 지었을 때 쓰는 이름
 // fav: 좋아하는 간식(TREATS의 이름). 주면 친밀도가 두 배로 오른다. cat: 고양이(꼬리를 느긋하게 흔든다)
+// 종을 더할 때: 그림은 sprites.js의 PET_PAL(같은 id), 목소리는 sfx.js의 VOICES. 고르는 창에는 여기 적은 차례로 나온다.
+// like: 1.5.0에서 더한 종에 적는다. 이 종을 모르는 예전 앱(1.4.0까지)이 내 가게를 구경할 때 대신 보여 줄 닮은 종이다.
+// (예전 앱은 모르는 종이 든 초대장을 아예 못 읽는다. 그래서 초대장에는 like를 적고 진짜 종은 뒤에 덧붙인다. visit.js)
 export const PETS = {
   schnauzer: { name: '슈나우저', hatDy: 0, nick: '슈슈', fav: 'jerky' },
   maltese: { name: '말티즈', hatDy: 0, nick: '몽이', fav: 'cake' },
   shiba: { name: '시바견', hatDy: 1, nick: '콩이', fav: 'biscuit' },
   poodle: { name: '푸들', hatDy: -1, nick: '초코', fav: 'cake' },
+  cocker: { name: '코카스파니엘', hatDy: 0, nick: '코코', fav: 'jerky', like: 'poodle' },
+  corgi: { name: '웰시코기', hatDy: 1, nick: '식빵', fav: 'biscuit', like: 'shiba' },
+  pome: { name: '포메라니안', hatDy: 0, nick: '솜이', fav: 'cake', like: 'shiba' },
+  bichon: { name: '비숑', hatDy: -1, nick: '구름이', fav: 'cake', like: 'maltese' },
+  golden: { name: '골든 리트리버', hatDy: 0, nick: '보리', fav: 'jerky', like: 'poodle' },
+  beagle: { name: '비글', hatDy: 0, nick: '호두', fav: 'biscuit', like: 'schnauzer' },
+  jindo: { name: '진돗개', hatDy: 1, nick: '백구', fav: 'jerky', like: 'shiba' },
   cheese: { name: '치즈 고양이', hatDy: 1, nick: '치즈', fav: 'jerky', cat: true },
   tuxedo: { name: '턱시도 고양이', hatDy: 1, nick: '턱시', fav: 'biscuit', cat: true },
   graycat: { name: '회색 고양이', hatDy: 1, nick: '구름', fav: 'cake', cat: true },

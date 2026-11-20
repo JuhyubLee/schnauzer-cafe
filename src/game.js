@@ -4,7 +4,7 @@ import {
   PETS, PET_SLOTS, PET_NAME_MAX, WEAR, START_ROWS, START_COLS, START_DOOR, EXPANSIONS, WIDENINGS, EXPAND_DIRS,
   STOVE_SPEED, STOVE_UPGRADE_COST, PHOTO_MAX_CHARS, TREATS, TREATS_PER_DAY, SHOP_TYPES, FIRST_SHOP, SHOP_RECIPES, SHOP_NAME_MAX,
   MANAGER_RATE, STAY_REST, REGULAR_EVERY, DISPLAY_PULL, DISPLAY_BONUS, FIT_TIME, POSE_TIME,
-  levelOf, stoveLimit, onSale, bondOf, dayKey, shopOf, furnIn, stayRounds, regularGift,
+  levelOf, stoveLimit, onSale, bondOf, dayKey, shopOf, furnIn, stayRounds, regularGift, sellPrice,
 } from './data.js';
 import { CUSTOMER_LOOKS, validIcon, mainColor } from './sprites.js';
 import { mirror } from './device.js';
@@ -1108,6 +1108,48 @@ export function storeItem(id) {
   return true;
 }
 
+// ───── 되팔기 ─────
+// 코인으로 산 가구와 옷은 산 값의 절반(data.js의 sellPrice)에 판다. 받은 코인은 지금 가게의 지갑에 들어간다.
+// 요리 기구와 도장으로 받은 것은 팔 수 없다. 가구는 꾸미기에서 올려 두고(pending) 판매 확정을 눌러야 팔린다.
+
+// target: { id } 놓여 있는 가구, { type } 보관해 둔 가구 하나
+const sellType = target => target.type ?? itemById(target.id).type;
+export const furnSellPrice = type => (type === 'stove' ? 0 : sellPrice(FURN[type]));
+export function askSell(target) {
+  const type = sellType(target);
+  if (!furnSellPrice(type)) return fail('이건 팔 수 없어요');
+  if (target.type && !(G.state.inv[type] > 0)) return fail('보관해 둔 것이 없어요');
+  G.edit.pending = { kind: 'sell', ...target };
+  return true;
+}
+
+function sellFurn(target) {
+  const s = G.state, e = G.edit, type = sellType(target), coins = furnSellPrice(type);
+  if (target.id != null) {
+    s.items = s.items.filter(i => i.id !== target.id);
+    e.sel = null;
+    e.dirty = true;
+  } else if (--s.inv[type] <= 0) {
+    delete s.inv[type];
+    if (e.place === type) e.place = null; // 다 팔았으면 놓기도 그만둔다
+  }
+  s.coins += coins;
+  emit('sell', { name: furnOf(type).name, coins });
+  return true;
+}
+
+// 옷장에 있는 옷을 판다. 입고 있던 친구는 모두 벗는다.
+export function sellWear(itemId) {
+  const s = G.state, item = WEAR[itemId], coins = sellPrice(item);
+  if (!s.closet.includes(itemId) || !coins) return fail('이 옷은 팔 수 없어요');
+  s.closet = s.closet.filter(id => id !== itemId);
+  for (const pet of s.pets) if (pet.wear[item.slot] === itemId) delete pet.wear[item.slot];
+  s.coins += coins;
+  emit('wear');
+  emit('sell', { name: item.name, coins });
+  return true;
+}
+
 export const upgradeCost = st => STOVE_UPGRADE_COST[st.lv - 1] ?? null;
 const upgradeError = st => (upgradeCost(st) == null ? '더 강화할 수 없어요' : G.state.coins < upgradeCost(st) ? '코인이 모자라요' : null);
 function upgradeStove(id) {
@@ -1241,7 +1283,7 @@ export function askUpgrade(id) {
   return true;
 }
 
-// 올려 둔 것의 이름과 값. 없으면 null.
+// 올려 둔 것의 이름과 값(cost 낼 코인, gain 받을 코인). 없으면 null.
 export function pendingInfo() {
   const p = G.edit?.pending;
   if (!p) return null;
@@ -1250,6 +1292,10 @@ export function pendingInfo() {
     case 'floor': return { name: `${FLOORS[p.id].name} ${p.tiles.length}칸`, cost: FLOORS[p.id].price * p.tiles.length };
     case 'wall': return { name: WALLS[p.id].name, cost: WALLS[p.id].price };
     case 'expand': return { name: `${EXPAND_DIRS[p.dir]} 한 줄 넓히기`, cost: expandCfg(p.dir).price };
+    case 'sell': {
+      const type = sellType(p), again = onSale(FURN[type]) ? '' : ' (지금은 다시 살 수 없어요)';
+      return { name: `${furnOf(type).name} 팔기${again}`, gain: furnSellPrice(type) };
+    }
     default: return { name: `${furnOf('stove').name} ${itemById(p.id).lv + 1}단계로 강화`, cost: upgradeCost(itemById(p.id)) };
   }
 }
@@ -1265,6 +1311,7 @@ export function confirmPending() {
       return true;
     case 'wall': return setWall(p.id);
     case 'expand': return expand(p.dir);
+    case 'sell': return sellFurn(p);
     default: return upgradeStove(p.id);
   }
 }
